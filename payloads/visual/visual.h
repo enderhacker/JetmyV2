@@ -121,7 +121,13 @@ inline void Tile(int x, int y, int step, uint32_t color) {
 
 // A first call with time == 0 resets animation state for independent menu previews.
 using PayloadFn = void (*)(float time, float dt);
-struct PayloadRecord { const char* name; PayloadFn fn; bool needsSnapshot = true; };
+struct PayloadRecord {
+    const char* name;
+    PayloadFn fn;
+    bool needsSnapshot = true;
+    // Clear the destination AFTER preserving the incoming image for texturing.
+    bool blackBackground = false;
+};
 const std::vector<PayloadRecord>& Registry();
 
 void EffectPixelFireworks(float, float);

@@ -13,9 +13,7 @@ void EffectMobiusRealityRibbon(float time, float) {
     const int columns = (w + step - 1) / step, rows = (h + step - 1) / step;
     static std::vector<float> depth;
     depth.assign(static_cast<size_t>(columns) * rows, std::numeric_limits<float>::max());
-    for (int y = 0; y < h; y += step)
-        for (int x = 0; x < w; x += step)
-            Tile(x, y, step, BlendColor(Sample(x, y), 0x050919, 0.95f));
+    Fill(0, 0, w, h, 0x000000);
 
     constexpr int segments = 160, strips = 12;
     RibbonVertex vertices[segments + 1][strips + 1];

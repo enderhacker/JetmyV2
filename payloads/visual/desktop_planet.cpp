@@ -14,7 +14,7 @@ void EffectDesktopPlanet(float time, float) {
         for (int x = 0; x < w; x += step) {
             float px = (x - cx) / (unit * 0.31f), py = (y - cy) / (unit * 0.31f);
             float radius2 = px * px + py * py;
-            uint32_t color = BlendColor(Sample(x, y), 0x030714, 0.94f);
+            uint32_t color = 0x000000;
             // Static sparse stars: no random full-screen flashing.
             uint32_t hash = uint32_t(x / step) * 374761393u ^ uint32_t(y / step) * 668265263u;
             hash = (hash ^ (hash >> 13)) * 1274126177u;

@@ -12,7 +12,7 @@ void EffectRotateScreen(float time, float) {
         for (int x = 0; x < g_ScreenWidth; x += step) {
             float dx = x - cx;
             float sx = cx + dx * c + dy * s, sy = cy - dx * s + dy * c;
-            uint32_t color = 0x101419;
+            uint32_t color = 0x000000;
             if (sx >= 0 && sx < g_ScreenWidth && sy >= 0 && sy < g_ScreenHeight)
                 color = Sample(int(sx), int(sy));
             Tile(x, y, step, color);

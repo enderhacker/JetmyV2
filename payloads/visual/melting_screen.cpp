@@ -39,7 +39,7 @@ void EffectMeltingScreen(float time, float) {
         float poolDepth = std::min(g_ScreenHeight * 0.12f, displacement * 0.09f);
         for (int y = 0; y < g_ScreenHeight; y += step) {
             float distance = y - front;
-            uint32_t color = 0x111316;
+            uint32_t color = 0x000000;
             if (distance >= 0) {
                 float sourceY = distance / stretch;
                 color = Sample(x, int(sourceY));
@@ -56,8 +56,6 @@ void EffectMeltingScreen(float time, float) {
                     color = BlendColor(color, pooled, Smooth(depth));
                     color = BlendColor(color, 0x080A0D, depth * 0.22f);
                 }
-            } else {
-                color = BlendColor(color, 0x000000, (1 - Smooth(-distance / 12)) * 0.65f);
             }
             Tile(x, y, step, color);
         }

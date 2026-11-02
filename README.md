@@ -120,6 +120,11 @@ Launch with `--menu` to open a native Windows control panel. All payloads start
 - Click a visual's button to turn it on; click again to turn it off.
 - Enable just one to inspect it, or enable several to combine their output.
 - Re-enabling an effect restarts its animation state.
+- Stage-style effects (fireworks, neon patterns, holograms, and the spectrum) use
+  black backgrounds. Shatter, voxel explosion, and Reality Collapse preserve the
+  incoming image as their texture, with black space around the moving pieces.
+  A black-backed effect covers earlier layers; effects drawn afterward can still
+  appear on top. Ordinary desktop distortions keep their image backgrounds.
 - Turning off every visual hides the effects overlay. The idle/audio-only menu
   does not capture or render the desktop.
 - The panel stays clear of the visual overlay so its controls remain usable.

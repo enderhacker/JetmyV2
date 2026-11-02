@@ -16,8 +16,7 @@ void EffectScreenPeelAndFold(float time, float) {
             uint32_t color;
             if (distance > curl) {
                 // Newly exposed backing, not a second copy of the original desktop.
-                float grid = (x / 24 + y / 24) % 2 ? 0.04f : 0;
-                color = BlendColor(0x111B29, 0x31445B, grid + 0.12f * y / unit);
+                color = 0x000000;
             } else if (distance >= 0) {
                 int sx = int(x + distance), sy = int(y + distance);
                 float light = sinf(distance / curl * Pi);

@@ -17,9 +17,6 @@ void EffectMatrixReconstruction(float time, float dt) {
         auto& stream = streams[column];
         stream.head += stream.speed * dt;
         if (stream.head - stream.length * 16 > g_ScreenHeight) stream.head = -16;
-        int x = int(column) * cell;
-        // Darken only this stream's footprint, leaving other payloads visible.
-        Tint(x, int(stream.head) - stream.length * 16, cell - 1, stream.length * 16 + 16, 0x02120C, 0.6f);
     }
     int saved = SaveDC(g_hMemDC);
     if (!saved) return;

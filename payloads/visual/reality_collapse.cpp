@@ -13,15 +13,8 @@ void EffectRealityCollapseFinale(float time, float) {
     heightScale = std::min(1.0f, heightScale);
     int w = std::max(1, int(g_ScreenWidth * widthScale)), h = std::max(1, int(g_ScreenHeight * heightScale));
     int x = (g_ScreenWidth - w) / 2, y = (g_ScreenHeight - h) / 2;
-    float dim = shut * (1 - reopen) * 0.88f;
-    // Keep stacked layers faintly visible outside the compressed image.
-    if (dim > 0.001f) {
-        int step = RasterStep();
-        for (int yy = 0; yy < g_ScreenHeight; yy += step)
-            for (int xx = 0; xx < g_ScreenWidth; xx += step)
-                if (xx < x || xx >= x + w || yy < y || yy >= y + h)
-                    Tile(xx, yy, step, BlendColor(Sample(xx, yy), 0x02040B, dim));
-    }
+    // The renderer supplies a black destination; only the shrinking image and
+    // its afterglow remain visible. The incoming image is safe in scratch.
     int saved = SaveDC(g_hMemDC);
     if (!saved) return;
     SetStretchBltMode(g_hMemDC, COLORONCOLOR);

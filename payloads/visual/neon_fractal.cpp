@@ -27,9 +27,9 @@ void EffectNeonFractalInvasion(float time, float) {
                 float next = zx * zx - zy * zy + cr;
                 zy = 2 * zx * zy + ci; zx = next; ++iteration;
             }
-            if (iteration == 24) continue; // Preserve other layers inside the set.
+            if (iteration == 24) continue; // Keep the interior of the set black.
             float density = Smooth(iteration / 12.0f);
-            Tile(x, y, step, BlendColor(Sample(x, y), palette[iteration], 0.2f + density * 0.6f));
+            Tile(x, y, step, BlendColor(0x000000, palette[iteration], 0.2f + density * 0.6f));
         }
     }
 }

@@ -279,6 +279,7 @@ int Run(HINSTANCE instance, bool menuMode) {
             float age = firstFrame ? 0 : std::chrono::duration<float>(now - activated[index]).count();
             const auto& payload = visuals[index];
             if (payload.needsSnapshot) memcpy(scratch.pixels, frame.pixels, totalBytes);
+            if (payload.blackBackground) std::fill_n(frame.pixels, totalBytes / sizeof(uint32_t), 0u);
             payload.fn(age, firstFrame ? 0 : std::min(dt, 0.1f));
             wasEnabled[index] = true;
             GdiFlush();
