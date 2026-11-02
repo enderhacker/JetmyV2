@@ -38,9 +38,10 @@ inline int FastRandInt(int min, int max) {
     return min >= max ? min : min + static_cast<int>(FastRand() % (max - min + 1));
 }
 inline float FastRandFloat(float min, float max) {
-    return min + (FastRand() * (1.0f / 4294967295.0f)) * (max - min);
+    return min + (static_cast<float>(FastRand() >> 8) * (1.0f / 16777216.0f)) * (max - min);
 }
 inline uint32_t BlendColor(uint32_t c1, uint32_t c2, float t) {
+    t = std::clamp(t, 0.0f, 1.0f);
     uint32_t inv = static_cast<uint32_t>((1.0f - t) * 256.0f);
     uint32_t w = static_cast<uint32_t>(t * 256.0f);
     return (((((c1 & 0x00FF00FF) * inv + (c2 & 0x00FF00FF) * w) >> 8) & 0x00FF00FF) |
@@ -70,11 +71,56 @@ inline void FastInvertRect(uint32_t* buf, int w, int h, int rx, int ry, int rw, 
 }
 // Bounds-safe block writes also support odd-sized displays.
 inline void DrawBlock(int x, int y, uint32_t color) {
-    FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x, y, 2, 2, color);
+    if (x < 0 || y < 0 || x >= g_ScreenWidth || y >= g_ScreenHeight) return;
+    auto* row = g_pFramePixels + static_cast<size_t>(y) * g_ScreenWidth + x;
+    row[0] = color;
+    if (x + 1 < g_ScreenWidth) row[1] = color;
+    if (y + 1 < g_ScreenHeight) {
+        row[g_ScreenWidth] = color;
+        if (x + 1 < g_ScreenWidth) row[g_ScreenWidth + 1] = color;
+    }
+}
+
+inline constexpr float Pi = 3.14159265359f;
+inline constexpr float Tau = 2 * Pi;
+inline float Smooth(float value) {
+    value = std::clamp(value, 0.0f, 1.0f);
+    return value * value * (3 - 2 * value);
+}
+inline uint32_t Sample(int x, int y) {
+    x = std::clamp(x, 0, g_ScreenWidth - 1);
+    y = std::clamp(y, 0, g_ScreenHeight - 1);
+    return g_pScratchPixels[static_cast<size_t>(y) * g_ScreenWidth + x];
+}
+inline void Pixel(int x, int y, uint32_t color) {
+    if (x >= 0 && y >= 0 && x < g_ScreenWidth && y < g_ScreenHeight)
+        g_pFramePixels[static_cast<size_t>(y) * g_ScreenWidth + x] = color;
+}
+inline void Line(int x0, int y0, int x1, int y1, uint32_t color) {
+    FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x0, y0, x1, y1, color);
+}
+inline void Fill(int x, int y, int w, int h, uint32_t color) {
+    FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x, y, w, h, color);
+}
+inline void Tint(int x, int y, int w, int h, uint32_t color, float opacity) {
+    int right = std::min(g_ScreenWidth, x + w), bottom = std::min(g_ScreenHeight, y + h);
+    for (int yy = std::max(0, y); yy < bottom; ++yy) {
+        auto* row = g_pFramePixels + static_cast<size_t>(yy) * g_ScreenWidth;
+        for (int xx = std::max(0, x); xx < right; ++xx) row[xx] = BlendColor(row[xx], color, opacity);
+    }
+}
+// Bound full-screen raster effects to about one million samples even at 4K.
+inline int RasterStep() {
+    int64_t area = static_cast<int64_t>(g_ScreenWidth) * g_ScreenHeight;
+    return area > 16000000 ? 8 : area > 4000000 ? 4 : 2;
+}
+inline void Tile(int x, int y, int step, uint32_t color) {
+    if (step == 2) DrawBlock(x, y, color);
+    else Fill(x, y, step, step, color);
 }
 
 using PayloadFn = void (*)(float time, float dt);
-struct PayloadRecord { const char* name; PayloadFn fn; };
+struct PayloadRecord { const char* name; PayloadFn fn; bool needsSnapshot = true; };
 const std::vector<PayloadRecord>& Registry();
 
 void EffectPixelFireworks(float, float);

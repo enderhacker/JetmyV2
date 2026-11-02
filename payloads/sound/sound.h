@@ -3,6 +3,9 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <mmsystem.h>
 #include <cstdint>
@@ -11,15 +14,27 @@
 
 namespace SoundPayloads {
 inline constexpr unsigned SampleRate = 8000;
-using Generator = float (*)(uint32_t sample, std::mt19937& random);
+// Every generated clip owns its oscillator/noise state; nothing leaks into the next sound.
+struct Voice {
+    std::mt19937& random;
+    uint32_t noiseState;
+    float phase = 0, secondPhase = 0, frequency = 440, sweep = 0, filteredNoise = 0;
+    float Noise() {
+        noiseState ^= noiseState << 13;
+        noiseState ^= noiseState >> 17;
+        noiseState ^= noiseState << 5;
+        return float(noiseState >> 8) * (2.0f / 16777215.0f) - 1;
+    }
+};
+using Generator = float (*)(uint32_t sample, Voice& voice);
 struct PayloadRecord { const char* name; Generator generate; };
 const std::vector<PayloadRecord>& Registry();
 
-float BytebeatPulse(uint32_t, std::mt19937&);
-float BytebeatMelody(uint32_t, std::mt19937&);
-float BytebeatArpeggio(uint32_t, std::mt19937&);
-float RandomChirps(uint32_t, std::mt19937&);
-float NoisePercussion(uint32_t, std::mt19937&);
+float BytebeatPulse(uint32_t, Voice&);
+float BytebeatMelody(uint32_t, Voice&);
+float BytebeatArpeggio(uint32_t, Voice&);
+float RandomChirps(uint32_t, Voice&);
+float NoisePercussion(uint32_t, Voice&);
 std::vector<int16_t> Synthesize(Generator generator, unsigned seconds, std::mt19937& random);
 
 // One device and one owned buffer: replacing a sound always resets the old one.

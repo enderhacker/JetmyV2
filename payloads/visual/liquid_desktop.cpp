@@ -2,18 +2,20 @@
 
 namespace VisualPayloads {
 void EffectLiquidDesktop(float time, float) {
-    float freqX = 0.024f + 0.006f * sinf(time * 0.7f);
-    float freqY = 0.028f + 0.005f * cosf(time * 0.9f);
-    std::vector<int> xShifts(g_ScreenHeight), yShifts(g_ScreenWidth);
-    for (int y = 0; y < g_ScreenHeight; ++y)
-        xShifts[y] = static_cast<int>(sinf(y * freqX + time * 6.5f) * 18.0f);
-    for (int x = 0; x < g_ScreenWidth; ++x)
-        yShifts[x] = static_cast<int>(cosf(x * freqY + time * 6.5f) * 14.0f);
-    for (int y = 0; y < g_ScreenHeight; y += 2) {
-        for (int x = 0; x < g_ScreenWidth; x += 2) {
-            int sx = std::clamp(x + xShifts[y], 0, g_ScreenWidth - 1);
-            int sy = std::clamp(y + yShifts[x], 0, g_ScreenHeight - 1);
-            DrawBlock(x, y, g_pScratchPixels[sy * g_ScreenWidth + sx]);
+    static std::vector<float> horizontal, vertical;
+    horizontal.resize(g_ScreenHeight); vertical.resize(g_ScreenWidth);
+    int step = RasterStep();
+    float amplitude = std::max(1.0f, std::min(g_ScreenWidth, g_ScreenHeight) * 0.018f);
+    // Two separable wave fields: trigonometry is O(width + height), not O(pixels).
+    for (int y = 0; y < g_ScreenHeight; y += step)
+        horizontal[y] = amplitude * (sinf(y * 0.018f + time * 1.7f) + 0.4f * sinf(y * 0.041f - time));
+    for (int x = 0; x < g_ScreenWidth; x += step)
+        vertical[x] = amplitude * 0.7f * sinf(x * 0.016f - time * 1.4f);
+    for (int y = 0; y < g_ScreenHeight; y += step) {
+        for (int x = 0; x < g_ScreenWidth; x += step) {
+            uint32_t color = Sample(int(x + horizontal[y]), int(y + vertical[x]));
+            float caustic = std::max(0.0f, (horizontal[y] + vertical[x]) / (amplitude * 2.2f));
+            Tile(x, y, step, BlendColor(color, 0xA1E8EF, caustic * caustic * 0.22f));
         }
     }
 }

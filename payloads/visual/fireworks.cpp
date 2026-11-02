@@ -2,36 +2,47 @@
 
 namespace VisualPayloads {
 namespace {
-struct Particle { float x, y, vx, vy; uint32_t col; float life; };
-std::vector<Particle> particles;
+struct Spark { float x, y, vx, vy, age, life; uint32_t color; };
+struct Rocket { float x, y, targetY; uint32_t color; };
 }
 void EffectPixelFireworks(float, float dt) {
-    if (FastRandInt(0, 5) == 0 || particles.empty()) {
-        float ox = FastRandFloat(g_ScreenWidth * 0.05f, g_ScreenWidth * 0.95f);
-        float oy = FastRandFloat(g_ScreenHeight * 0.05f, g_ScreenHeight * 0.65f);
-        uint32_t col = (FastRand() & 0x00FFFFFF) | 0x00404040;
-        int count = FastRandInt(30, 70);
-        float baseSpd = FastRandFloat(100.0f, 450.0f);
-        for (int i = 0; i < count; ++i) {
-            float ang = FastRandFloat(0.0f, 6.28318f);
-            float spd = baseSpd * FastRandFloat(0.3f, 1.2f);
-            particles.push_back({ox, oy, cosf(ang) * spd, sinf(ang) * spd, col, FastRandFloat(0.4f, 1.4f)});
-        }
+    static std::vector<Spark> sparks;
+    static std::vector<Rocket> rockets;
+    static float spawn = 1;
+    if (sparks.capacity() < 320) { sparks.reserve(320); rockets.reserve(4); }
+    constexpr uint32_t colors[] = {0xFFB454, 0x65E6FF, 0xFF72AB, 0xBAFF86, 0xCE9CFF};
+    spawn += dt;
+    if (spawn >= 0.85f && rockets.size() < 4) {
+        spawn = 0;
+        rockets.push_back({FastRandFloat(0.1f, 0.9f) * g_ScreenWidth, float(g_ScreenHeight),
+            FastRandFloat(0.16f, 0.55f) * g_ScreenHeight, colors[FastRandInt(0, 4)]});
     }
-    for (size_t i = 0; i < particles.size();) {
-        auto& p = particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vy += 320.0f * dt;
-        p.life -= dt;
-        int ix = static_cast<int>(p.x), iy = static_cast<int>(p.y);
-        if (p.life > 0 && ix >= 0 && ix < g_ScreenWidth - 2 && iy >= 0 && iy < g_ScreenHeight - 2) {
-            FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, ix, iy, 3, 3, p.col);
-            ++i;
-        } else {
-            particles[i] = particles.back();
-            particles.pop_back();
+    for (size_t i = 0; i < rockets.size();) {
+        auto& r = rockets[i];
+        r.y -= std::max(100.0f, g_ScreenHeight * 0.85f) * dt;
+        Line(int(r.x), int(r.y), int(r.x), int(r.y + 16), r.color);
+        if (r.y > r.targetY) { ++i; continue; }
+        for (int j = 0; j < 64 && sparks.size() < 320; ++j) {
+            float a = j * Tau / 64 + FastRandFloat(-0.035f, 0.035f);
+            float speed = FastRandFloat(0.1f, 0.3f) * std::min(g_ScreenWidth, g_ScreenHeight);
+            sparks.push_back({r.x, r.y, cosf(a) * speed, sinf(a) * speed, 0, FastRandFloat(1.1f, 1.8f), r.color});
         }
+        rockets[i] = rockets.back(); rockets.pop_back();
+    }
+    for (size_t i = 0; i < sparks.size();) {
+        auto& p = sparks[i];
+        p.age += dt;
+        if (p.age >= p.life) { sparks[i] = sparks.back(); sparks.pop_back(); continue; }
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.vy += g_ScreenHeight * 0.12f * dt;
+        float brightness = 1 - p.age / p.life;
+        for (int tail = 4; tail >= 0; --tail) {
+            float lag = tail * 0.018f;
+            uint32_t color = BlendColor(0x211629, p.color, brightness * (1 - tail * 0.16f));
+            Fill(int(p.x - p.vx * lag), int(p.y - p.vy * lag), 2, 2, color);
+        }
+        Pixel(int(p.x), int(p.y), BlendColor(p.color, 0xFFFFFF, brightness * 0.6f));
+        ++i;
     }
 }
 }

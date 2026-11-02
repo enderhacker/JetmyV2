@@ -2,26 +2,29 @@
 
 namespace VisualPayloads {
 void EffectBlackHoleSingularities(float time, float) {
-    float hx = g_ScreenWidth * (0.5f + 0.35f * sinf(time * 1.8f + 1.2f));
-    float hy = g_ScreenHeight * (0.5f + 0.30f * cosf(time * 1.3f));
-    float radius = 220.0f + 40.0f * sinf(time * 3.0f);
-    float twist = 4.2f + sinf(time * 2.0f) * 1.5f;
-    int minX = std::max(0, static_cast<int>(hx - radius));
-    int maxX = std::min(g_ScreenWidth - 1, static_cast<int>(hx + radius));
-    int minY = std::max(0, static_cast<int>(hy - radius));
-    int maxY = std::min(g_ScreenHeight - 1, static_cast<int>(hy + radius));
-    for (int y = minY; y <= maxY; y += 2) {
-        for (int x = minX; x <= maxX; x += 2) {
-            float dx = x - hx, dy = y - hy;
-            float distSq = dx * dx + dy * dy;
-            if (distSq < radius * radius) {
-                float dist = sqrtf(distSq), factor = 1.0f - dist / radius;
-                float a = atan2f(dy, dx) + factor * twist;
-                float newDist = dist * (1.0f - factor * 0.55f);
-                int sx = std::clamp(static_cast<int>(hx + cosf(a) * newDist), 0, g_ScreenWidth - 1);
-                int sy = std::clamp(static_cast<int>(hy + sinf(a) * newDist), 0, g_ScreenHeight - 1);
-                DrawBlock(x, y, g_pScratchPixels[sy * g_ScreenWidth + sx]);
-            }
+    float radius = std::max(1.0f, std::min(g_ScreenWidth, g_ScreenHeight) * 0.28f);
+    float hx = g_ScreenWidth * (0.5f + 0.22f * sinf(time * 0.37f));
+    float hy = g_ScreenHeight * (0.5f + 0.18f * cosf(time * 0.29f));
+    int step = RasterStep();
+    int left = std::max(0, int(hx - radius)), top = std::max(0, int(hy - radius));
+    int right = std::min(g_ScreenWidth, int(hx + radius + 1));
+    int bottom = std::min(g_ScreenHeight, int(hy + radius + 1));
+    for (int y = top; y < bottom; y += step) {
+        for (int x = left; x < right; x += step) {
+            float dx = (x - hx) / radius, dy = (y - hy) / radius;
+            float r2 = dx * dx + dy * dy;
+            if (r2 >= 1) continue;
+            float r = sqrtf(r2), edge = Smooth((1 - r) * 5);
+            float angle = atan2f(dy, dx);
+            float twist = 2.8f * (1 - r) * (1 - r) + time * 0.24f;
+            float c = cosf(twist), s = sinf(twist), pull = 1 - edge * 0.25f;
+            uint32_t warped = Sample(int(hx + (dx * c - dy * s) * radius * pull),
+                int(hy + (dx * s + dy * c) * radius * pull));
+            float ring = std::max(0.0f, 1 - fabsf(r - 0.31f) * 22);
+            uint32_t hot = BlendColor(0xD84919, 0xFFF0AB, 0.5f + 0.5f * sinf(angle * 3 - time * 2));
+            uint32_t color = BlendColor(warped, 0x080712, Smooth((0.25f - r) * 30));
+            color = BlendColor(color, hot, ring * 0.95f);
+            Tile(x, y, step, BlendColor(Sample(x, y), color, edge));
         }
     }
 }

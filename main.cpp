@@ -16,7 +16,9 @@ constexpr int ExitHotkey = 101;
 constexpr wchar_t ClassName[] = L"StackedChaosOverlay";
 
 LRESULT CALLBACK WndProc(HWND window, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if ((msg == WM_HOTKEY && wParam == ExitHotkey) || msg == WM_CLOSE) {
+    if ((msg == WM_HOTKEY && wParam == ExitHotkey) || msg == WM_CLOSE ||
+        msg == WM_DISPLAYCHANGE || (msg == WM_ENDSESSION && wParam)) {
+        // Stop cleanly rather than using stale framebuffer dimensions after a display change.
         running = false;
         return 0;
     }
@@ -116,7 +118,7 @@ int Run(HINSTANCE instance) {
     Overlay overlay(instance);
     overlay.Create(g_ScreenWidth, g_ScreenHeight);
     SoundPayloads::Player sound; // Destroy sound before removing overlay and buffers.
-    int echoW = std::max(1, g_ScreenWidth / 2), echoH = std::max(1, g_ScreenHeight / 2);
+    int echoW = std::max(1, g_ScreenWidth / 4), echoH = std::max(1, g_ScreenHeight / 4);
     g_EchoHistory.resize(MAX_ECHOES);
     for (auto& echo : g_EchoHistory) {
         echo.w = echoW; echo.h = echoH;
@@ -135,6 +137,7 @@ int Run(HINSTANCE instance) {
     auto lastFrame = start;
     int currentStage = -1;
     float echoTick = 0;
+    bool historyReady = false;
     bool shown = false;
     POINT origin = {0, 0};
     SIZE size = {g_ScreenWidth, g_ScreenHeight};
@@ -168,24 +171,32 @@ int Run(HINSTANCE instance) {
         if (!captured) throw std::runtime_error("Desktop capture failed.");
         GdiFlush(); // Synchronize GDI writes before accessing DIB memory.
         echoTick += dt;
-        if (echoTick >= 0.08f) {
+        if (!historyReady || echoTick >= 0.08f) {
             echoTick = 0;
             auto& echo = g_EchoHistory[g_EchoHead % MAX_ECHOES];
             for (int y = 0; y < echoH; ++y)
                 for (int x = 0; x < echoW; ++x)
                     echo.pixels[y * echoW + x] = base.pixels[(y * g_ScreenHeight / echoH) * g_ScreenWidth + x * g_ScreenWidth / echoW];
             ++g_EchoHead;
+            if (!historyReady) {
+                for (size_t i = 1; i < MAX_ECHOES; ++i) g_EchoHistory[i].pixels = echo.pixels;
+                historyReady = true;
+            }
         }
         memcpy(frame.pixels, base.pixels, totalBytes);
         for (int i = 0; i <= stage; ++i) {
-            memcpy(scratch.pixels, frame.pixels, totalBytes);
-            visuals[pool[i]].fn(time, std::min(dt, 0.1f));
+            const auto& payload = visuals[pool[i]];
+            if (payload.needsSnapshot) memcpy(scratch.pixels, frame.pixels, totalBytes);
+            payload.fn(std::max(0.0f, time - i * Runtime::StageSeconds), std::min(dt, 0.1f));
             GdiFlush();
         }
         if (!UpdateLayeredWindow(overlay.window, nullptr, &origin, &size, frame.dc, &origin, 0, &blend, ULW_ALPHA))
             throw std::runtime_error("Cannot present overlay frame.");
         if (!shown) { ShowWindow(overlay.window, SW_SHOWNOACTIVATE); shown = true; }
-        Sleep(16);
+        // Rendering time counts toward the frame budget instead of adding to it.
+        auto remaining = std::chrono::milliseconds(16) - (Clock::now() - now);
+        if (remaining > Clock::duration::zero())
+            Sleep(static_cast<DWORD>(std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count()));
     }
     sound.Stop();
     return 0;

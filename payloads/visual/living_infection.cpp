@@ -1,17 +1,44 @@
 #include "visual.h"
+#include <array>
 
 namespace VisualPayloads {
-void EffectLivingInfection(float, float) {
-    uint32_t colors[] = {0x0000FF7F, 0x00FF0055, 0x0000E5FF, 0x00FFD700, 0x009900FF};
-    for (int root = 0; root < 5; ++root) {
-        int cx = FastRandInt(0, g_ScreenWidth);
-        int cy = root % 2 == 0 ? 0 : g_ScreenHeight - 1;
-        for (int i = 0; i < 40; ++i) {
-            int nx = cx + FastRandInt(-22, 22);
-            int ny = cy + (root % 2 == 0 ? FastRandInt(6, 26) : FastRandInt(-26, -6));
-            FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, cx, cy, nx, ny, colors[root]);
-            cx = nx; cy = ny;
+void EffectLivingInfection(float time, float dt) {
+    struct Tip { float x, y, angle, age; uint32_t color; };
+    struct Segment { int x0, y0, x1, y1; float born; uint32_t color; };
+    static std::vector<Tip> tips;
+    static std::array<Segment, 1400> segments{};
+    static size_t head = 0, count = 0;
+    static float tick = 1;
+    constexpr uint32_t colors[] = {0x75FFA1, 0xA8E873, 0x42DCD0};
+    if (tips.capacity() < 72) tips.reserve(72);
+    tick += dt;
+    if (tick >= 0.045f) {
+        tick = 0;
+        if (tips.size() < 8) tips.push_back({FastRandFloat(0, float(g_ScreenWidth)),
+            float(g_ScreenHeight - 1), -Pi * 0.5f, 0, colors[FastRandInt(0, 2)]});
+        size_t initial = tips.size();
+        for (size_t i = 0; i < initial; ++i) {
+            auto p = tips[i];
+            p.angle += FastRandFloat(-0.38f, 0.38f);
+            float length = std::max(3.0f, g_ScreenHeight * 0.009f);
+            float nx = p.x + cosf(p.angle) * length, ny = p.y + sinf(p.angle) * length;
+            segments[head++ % segments.size()] = {int(p.x), int(p.y), int(nx), int(ny), time, p.color};
+            count = std::min(count + 1, segments.size());
+            p.x = nx; p.y = ny; p.age += 0.045f;
+            if (nx < 0 || nx >= g_ScreenWidth || ny < 0 || ny >= g_ScreenHeight || p.age > 4) p.age = 100;
+            tips[i] = p;
+            if (p.age < 3 && tips.size() < 72 && FastRandInt(0, 20) == 0) {
+                p.angle += FastRandInt(0, 1) ? 0.7f : -0.7f;
+                tips.push_back(p);
+            }
         }
+        tips.erase(std::remove_if(tips.begin(), tips.end(), [](const Tip& p) { return p.age > 4; }), tips.end());
     }
+    for (size_t i = 0; i < count; ++i) {
+        const auto& s = segments[i];
+        float fade = 1 - (time - s.born) / 3.5f;
+        if (fade > 0) Line(s.x0, s.y0, s.x1, s.y1, BlendColor(0x10342A, s.color, fade));
+    }
+    for (const auto& p : tips) Fill(int(p.x) - 1, int(p.y) - 1, 3, 3, 0xE7FFD9);
 }
 }

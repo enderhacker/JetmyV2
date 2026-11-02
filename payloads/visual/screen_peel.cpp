@@ -2,12 +2,31 @@
 
 namespace VisualPayloads {
 void EffectScreenPeelAndFold(float time, float) {
-    float t = (sinf(time * 2.4f) + 1) * 0.5f;
-    int peelX = static_cast<int>(g_ScreenWidth * 0.55f * t), peelY = static_cast<int>(g_ScreenHeight * 0.55f * t);
-    for (int y = 0; y < peelY && y < g_ScreenHeight; ++y) {
-        int maxX = static_cast<int>(peelX * (1 - float(y) / (peelY + 1)));
-        for (int x = 0; x < maxX && x < g_ScreenWidth; ++x)
-            g_pFramePixels[y * g_ScreenWidth + x] = ((x ^ y) & 8) ? 0x0000FFAA : 0x00101010;
+    // A diagonal paper curl, with a reflected underside and a narrow rolling highlight.
+    float amount = 0.08f + 0.65f * (0.5f - 0.5f * cosf(time * 0.55f));
+    float unit = float(std::max(1, std::min(g_ScreenWidth, g_ScreenHeight)));
+    float crease = amount * unit;
+    float curl = std::max(2.0f, unit * 0.035f);
+    int step = RasterStep();
+    int limitY = std::min(g_ScreenHeight, int(crease + curl + 1));
+    for (int y = 0; y < limitY; y += step) {
+        int limitX = std::min(g_ScreenWidth, int(crease + curl - y + 1));
+        for (int x = 0; x < limitX; x += step) {
+            float distance = crease - (x + y);
+            uint32_t color;
+            if (distance > curl) {
+                // Newly exposed backing, not a second copy of the original desktop.
+                float grid = (x / 24 + y / 24) % 2 ? 0.04f : 0;
+                color = BlendColor(0x111B29, 0x31445B, grid + 0.12f * y / unit);
+            } else if (distance >= 0) {
+                int sx = int(x + distance), sy = int(y + distance);
+                float light = sinf(distance / curl * Pi);
+                color = BlendColor(Sample(sx, sy), 0xF2E8CD, 0.55f + light * 0.35f);
+            } else {
+                color = BlendColor(Sample(x, y), 0x03060D, (1 + distance / curl) * 0.45f);
+            }
+            Tile(x, y, step, color);
+        }
     }
 }
 }
