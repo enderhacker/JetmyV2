@@ -37,7 +37,13 @@ const std::vector<PayloadRecord>& Registry() {
         { "Reality Collapse Finale", EffectRealityCollapseFinale },
         { "Rotate Screen", EffectRotateScreen },
         { "Random Status Icons", EffectRandomStatusIcons, false },
-        { "Melting Screen", EffectMeltingScreen }
+        { "Melting Screen", EffectMeltingScreen },
+        { "Infinite Tunnel", EffectInfiniteTunnel },
+        { "XOR Color Chaos", EffectXorColorChaos },
+        { "Screen Color Inversion", EffectScreenColorInversion, false },
+        { "Reversed Interface Text", EffectReverseText, false },
+        { "Popup Cascade", EffectPopupCascade, false },
+        { "Slight Mouse Movement", EffectMouseDrift, false }
     };
     return payloads;
 }
