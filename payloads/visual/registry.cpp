@@ -34,7 +34,10 @@ const std::vector<PayloadRecord>& Registry() {
         { "Screen Peel & Fold", EffectScreenPeelAndFold },
         { "Holographic Glitch Objects", EffectHolographicGlitch, false },
         { "Synesthesia Storm", EffectSynesthesiaStorm, false },
-        { "Reality Collapse Finale", EffectRealityCollapseFinale }
+        { "Reality Collapse Finale", EffectRealityCollapseFinale },
+        { "Rotate Screen", EffectRotateScreen },
+        { "Random Status Icons", EffectRandomStatusIcons, false },
+        { "Melting Screen", EffectMeltingScreen }
     };
     return payloads;
 }

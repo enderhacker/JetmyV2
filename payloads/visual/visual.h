@@ -149,5 +149,8 @@ void EffectScreenPeelAndFold(float, float);
 void EffectHolographicGlitch(float, float);
 void EffectSynesthesiaStorm(float, float);
 void EffectRealityCollapseFinale(float, float);
+void EffectRotateScreen(float, float);
+void EffectRandomStatusIcons(float, float);
+void EffectMeltingScreen(float, float);
 
 } // namespace VisualPayloads

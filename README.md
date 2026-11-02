@@ -1,6 +1,6 @@
 # Visual and sound payload demo
 
-Windows desktop overlay with 25 visual effects and 15 synthesized sounds.
+Windows desktop overlay with 28 visual effects and 15 synthesized sounds.
 Effects only draw into the overlay; they do not modify the desktop itself.
 
 ## Sequence
@@ -92,6 +92,9 @@ change exits cleanly rather than continuing with stale framebuffer dimensions.
 | Holographic Glitch Objects | Projected cube, octahedron and tetrahedron with ghost edges. |
 | Synesthesia Storm | Smoothed radial pseudo-spectrum, peak markers and procedural scope traces. |
 | Reality Collapse Finale | Vertical screen compression, horizontal collapse, afterglow and reopening. |
+| Rotate Screen | Continuous rotation around the screen center, without changing Windows display settings. |
+| Random Status Icons | Warning, information, error and success icons at random positions and sizes. |
+| Melting Screen | Gravity-accelerated viscous folds, uneven stretching, wet edges and bottom pooling. |
 
 The spectrum is procedural, not microphone input or audio analysis. Sounds have
 independent per-clip state, DC removal, mild low-pass filtering, bounded output,
