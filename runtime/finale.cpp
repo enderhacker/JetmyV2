@@ -55,11 +55,11 @@ public:
     HDC canvas = nullptr;
     HBITMAP bitmap = nullptr;
     HGDIOBJ previousBitmap = nullptr;
-    HFONT font = nullptr;
+    BlueScreenArtwork artwork;
     bool registered = false, dismissed = false;
     int progress = -1;
     std::chrono::steady_clock::time_point presentedAt{};
-    explicit BlueScreen(HINSTANCE app) : instance(app) {}
+    BlueScreen(HINSTANCE app, BlueScreenStyle style) : instance(app), artwork(style) {}
     ~BlueScreen() {
         bool restoreFocus = window && GetForegroundWindow() == window;
         if (window) { KillTimer(window, 1); DestroyWindow(window); }
@@ -68,7 +68,6 @@ public:
         if (canvas && previousBitmap) SelectObject(canvas, previousBitmap);
         if (bitmap) DeleteObject(bitmap);
         if (canvas) DeleteDC(canvas);
-        if (font) DeleteObject(font);
         if (registered) UnregisterClassW(FinaleClass, instance);
         // Cursor visibility was only changed by WM_SETCURSOR, never ShowCursor.
         POINT cursor{};
@@ -82,7 +81,7 @@ public:
         if (!canvas) throw std::runtime_error("Cannot create blue-screen canvas.");
         BITMAPINFO info{};
         info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        info.bmiHeader.biWidth = 640; info.bmiHeader.biHeight = -480;
+        info.bmiHeader.biWidth = artwork.Width(); info.bmiHeader.biHeight = -artwork.Height();
         info.bmiHeader.biPlanes = 1; info.bmiHeader.biBitCount = 32;
         void* pixels = nullptr;
         bitmap = CreateDIBSection(canvas, &info, DIB_RGB_COLORS, &pixels, nullptr, 0);
@@ -92,9 +91,6 @@ public:
             previousBitmap = nullptr;
             throw std::runtime_error("Cannot select blue-screen canvas.");
         }
-        font = CreateFontW(-12, 7, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, FIXED_PITCH, L"Lucida Console");
-        if (!font) throw std::runtime_error("Cannot create blue-screen font.");
         WNDCLASSW wc{};
         wc.lpfnWndProc = Procedure; wc.hInstance = instance; wc.lpszClassName = FinaleClass;
         // No class cursor: the cursor is hidden only over this presentation window.
@@ -118,48 +114,16 @@ public:
         if (percent == progress) return;
         bool initial = progress < 0;
         progress = percent;
-        RECT rect = initial ? RECT{0, 0, 640, 480} : RECT{20, 438, 620, 454};
-        HBRUSH blue = CreateSolidBrush(RGB(0, 0, 170));
-        if (!blue) throw std::runtime_error("Cannot create blue-screen background.");
-        FillRect(canvas, &rect, blue); DeleteObject(blue);
-        int saved = SaveDC(canvas);
-        if (!saved) throw std::runtime_error("Cannot save blue-screen drawing state.");
-        SelectObject(canvas, font);
-        SetTextColor(canvas, RGB(255, 255, 255)); SetBkMode(canvas, TRANSPARENT);
-        auto line = [&](int row, const wchar_t* text) { TextOutW(canvas, 20, 22 + row * 16, text, int(std::wcslen(text))); };
-        if (initial) {
-            line(0, L"A problem has been detected and Windows has been shut down to prevent");
-            line(1, L"damage to your computer.");
-            line(3, L"PAGE_FAULT_IN_NONPAGED_AREA");
-            line(5, L"If this is the first time you've seen this Stop error screen,");
-            line(6, L"restart your computer. If this screen appears again, follow");
-            line(7, L"these steps:");
-            line(9, L"Check to make sure any new hardware or software is properly installed.");
-            line(10, L"If this is a new installation, ask your hardware or software manufacturer");
-            line(11, L"for any Windows updates you might need.");
-            line(13, L"If problems continue, disable or remove any newly installed hardware");
-            line(14, L"or software. Disable BIOS memory options such as caching or shadowing.");
-            line(15, L"If you need to use Safe Mode to remove or disable components, restart");
-            line(16, L"your computer, press F8 to select Advanced Startup Options, and then");
-            line(17, L"select Safe Mode.");
-            line(19, L"Technical information:");
-            line(21, L"*** STOP: 0x00000050 (0xE1A7D000, 0x00000000, 0xBF8013B2, 0x00000001)");
-            line(23, L"*** win32k.sys - Address BF8013B2 base at BF800000, DateStamp 3b7de698");
-            line(25, L"Beginning dump of physical memory");
-        }
-        wchar_t dump[80]{};
-        std::swprintf(dump, 80, L"Dumping physical memory to disk: %d", progress);
-        line(26, dump);
-        RestoreDC(canvas, saved);
-        GdiFlush();
+        artwork.Draw(canvas, progress, initial);
         // The text is cosmetic. No memory dump, file write, crash, or reboot occurs.
         if (initial) InvalidateRect(window, nullptr, FALSE);
         else {
+            RECT rect = artwork.ProgressRect();
             RECT image = ImageRect();
-            RECT dirty{image.left + rect.left * (image.right - image.left) / 640,
-                image.top + rect.top * (image.bottom - image.top) / 480,
-                image.left + (rect.right * (image.right - image.left) + 639) / 640,
-                image.top + (rect.bottom * (image.bottom - image.top) + 479) / 480};
+            RECT dirty{image.left + rect.left * (image.right - image.left) / artwork.Width(),
+                image.top + rect.top * (image.bottom - image.top) / artwork.Height(),
+                image.left + (rect.right * (image.right - image.left) + artwork.Width() - 1) / artwork.Width(),
+                image.top + (rect.bottom * (image.bottom - image.top) + artwork.Height() - 1) / artwork.Height()};
             InvalidateRect(window, &dirty, FALSE);
         }
     }
@@ -185,7 +149,7 @@ public:
                 FillRect(dc, &bar, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
         SetStretchBltMode(dc, COLORONCOLOR);
         StretchBlt(dc, image.left, image.top, image.right - image.left, image.bottom - image.top,
-            canvas, 0, 0, 640, 480, SRCCOPY);
+            canvas, 0, 0, artwork.Width(), artwork.Height(), SRCCOPY);
         EndPaint(window, &paint);
     }
     static LRESULT CALLBACK Procedure(HWND window, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -211,9 +175,9 @@ public:
 };
 }
 
-bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& shouldExit) {
+bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& shouldExit, BlueScreenStyle style) {
     using Clock = std::chrono::steady_clock;
-    BlueScreen screen(instance);
+    BlueScreen screen(instance, style);
     ErrorTone tone;
     tone.Prepare(); // Allocate/open audio before the visible ten-second countdown.
     screen.Create();

@@ -6,7 +6,7 @@ namespace Runtime {
 namespace {
 constexpr wchar_t MenuClass[] = L"JetmyPayloadControlPanel";
 constexpr wchar_t PaneClass[] = L"JetmyPayloadControlPane";
-constexpr int VisualBase = 1000, AudioBase = 2000, StopAll = 10, Close = 11, Finale = 12;
+constexpr int VisualBase = 1000, AudioBase = 2000, StopAll = 10, Close = 11, Finale = 12, FinaleStyle = 13;
 std::wstring Wide(const char* text) { return std::wstring(text, text + strlen(text)); } // Registry names are ASCII.
 }
 
@@ -61,6 +61,11 @@ void ControlPanel::Create() {
     stop_ = Add(window_, L"BUTTON", L"Stop all", BS_PUSHBUTTON | WS_TABSTOP, StopAll);
     close_ = Add(window_, L"BUTTON", L"Close", BS_PUSHBUTTON | WS_TABSTOP, Close);
     finale_ = Add(window_, L"BUTTON", L"Blue screen (10s)", BS_PUSHBUTTON | WS_TABSTOP, Finale);
+    finaleLabel_ = Add(window_, L"STATIC", L"Blue-screen style", SS_LEFT);
+    finaleStyle_ = Add(window_, L"COMBOBOX", std::wstring{}, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FinaleStyle);
+    for (const auto* style : {L"Automatic (this PC)", L"Windows XP", L"Windows Vista", L"Windows 7", L"Windows 10", L"Windows 11 (blue)"})
+        SendMessageW(finaleStyle_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(style));
+    SendMessageW(finaleStyle_, CB_SETCURSEL, 0, 0);
     status_ = Add(window_, L"STATIC", std::wstring{}, SS_LEFT);
     hint_ = Add(window_, L"STATIC", L"Flashing visuals / electronic audio. Emergency exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.", SS_LEFT);
     for (auto* pane : {&visuals_, &audio_}) {
@@ -103,9 +108,11 @@ void ControlPanel::Layout() {
     move(description_, pad, Scale(60), w - pad * 2, Scale(42));
     move(visualsTitle_, pad, Scale(112), column, Scale(24));
     move(audioTitle_, right, Scale(112), column, Scale(24));
-    int top = Scale(144), bottom = h - Scale(112);
+    int top = Scale(144), bottom = h - Scale(152);
     if (visuals_.window) move(visuals_.window, pad, top, column, bottom - top);
     if (audio_.window) move(audio_.window, right, top, w - pad - right, bottom - top);
+    move(finaleLabel_, pad, h - Scale(132), Scale(144), Scale(26));
+    move(finaleStyle_, pad + Scale(150), h - Scale(136), Scale(208), Scale(220));
     move(status_, pad, h - Scale(94), w - pad * 2 - Scale(298), Scale(44));
     move(finale_, w - pad - Scale(284), h - Scale(94), Scale(176), Scale(34));
     move(close_, w - pad - Scale(96), h - Scale(94), Scale(96), Scale(34));
@@ -158,6 +165,11 @@ LRESULT CALLBACK ControlPanel::WindowProc(HWND window, UINT msg, WPARAM wParam, 
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(panel));
     }
     if (panel) {
+        if (msg == WM_COMMAND && LOWORD(wParam) == FinaleStyle && HIWORD(wParam) == CBN_SELCHANGE) {
+            LRESULT selection = SendMessageW(panel->finaleStyle_, CB_GETCURSEL, 0, 0);
+            if (selection >= 0 && selection <= 5) panel->controls_.finaleStyle = static_cast<BlueScreenStyle>(selection);
+            return 0;
+        }
         if (msg == WM_COMMAND && HIWORD(wParam) == BN_CLICKED) { panel->Command(LOWORD(wParam)); return 0; }
         if (msg == WM_SIZE) { panel->Layout(); return 0; }
         if (msg == WM_CLOSE || msg == WM_DISPLAYCHANGE || (msg == WM_ENDSESSION && wParam)) { panel->controls_.closing = true; return 0; }

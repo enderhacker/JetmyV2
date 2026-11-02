@@ -45,13 +45,18 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 
 **Simulated Blue Screen:** always follows the automatic 100-second show, or runs
 from the menu's **Blue screen (10s)** button. Stops all visuals and audio, then
-shows a centered 4:3 classic crash screen for 10 seconds with a continuous 800 Hz
+shows a centered 4:3 version-specific crash screen for 10 seconds with a continuous 800 Hz
 error tone at bounded amplitude and black surrounding
 space and the cursor hidden over the presentation. Other monitors are blacked out.
 Afterward, automatic mode exits; manual mode returns with all payloads off.
 No crash, reboot, memory dump, display-mode change or global input lock occurs.
 Ordinary input is consumed only while its window has focus. Escape and emergency
 shortcuts can exit early; system shortcuts remain available.
+Automatic mode detects the Windows version; the menu can also preview XP, Vista,
+7, 10, and the historical Windows 11 blue design individually. Classic styles use
+monospaced STOP diagnostics; modern styles use Segoe UI, a sad face, progress,
+stop-code details, and a locally generated QR code linking to Microsoft's support
+page. The Windows 11 preset intentionally does not use its newer black design.
 
 ## Sound payloads
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "../payloads/visual/visual.h"
+#include "blue_screen.h"
 #include <string>
 
 namespace Runtime {
@@ -10,6 +11,7 @@ struct Controls {
     uint64_t audioRevision = 0;
     bool closing = false;
     bool finaleRequested = false;
+    BlueScreenStyle finaleStyle = BlueScreenStyle::Automatic;
 };
 
 // Native Win32 controls retain keyboard navigation, focus and accessibility.
@@ -42,6 +44,7 @@ private:
     HWND window_ = nullptr, title_ = nullptr, description_ = nullptr;
     HWND visualsTitle_ = nullptr, audioTitle_ = nullptr, stop_ = nullptr, close_ = nullptr, status_ = nullptr, hint_ = nullptr;
     HWND finale_ = nullptr;
+    HWND finaleLabel_ = nullptr, finaleStyle_ = nullptr;
     Pane visuals_, audio_;
     HFONT font_ = nullptr, titleFont_ = nullptr;
     int dpi_ = 96;

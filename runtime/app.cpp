@@ -200,7 +200,7 @@ int Run(HINSTANCE instance, bool menuMode) {
             }
             bool completed = Runtime::RunBlueScreenFinale(instance, [&] {
                 return !running || controls.closing || ExitRequested();
-            });
+            }, controls.finaleStyle);
             if (!menuMode || !completed || !running || controls.closing || ExitRequested()) break;
             historyReady = false; echoTick = 0; g_EchoHead = 0;
             lastFrame = Clock::now();
