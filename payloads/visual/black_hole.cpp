@@ -1,10 +1,45 @@
 #include "visual.h"
 
 namespace VisualPayloads {
-void EffectBlackHoleSingularities(float time, float) {
-    float radius = std::max(1.0f, std::min(g_ScreenWidth, g_ScreenHeight) * 0.28f);
-    float hx = g_ScreenWidth * (0.5f + 0.22f * sinf(time * 0.37f));
-    float hy = g_ScreenHeight * (0.5f + 0.18f * cosf(time * 0.29f));
+void EffectBlackHoleSingularities(float time, float dt) {
+    static float hx = 0, hy = 0, heading = 0, speed = 0, targetSpeed = 0;
+    static float turn = 0, targetTurn = 0, remaining = 0;
+    static int width = 0, height = 0;
+    float unit = float(std::max(1, std::min(g_ScreenWidth, g_ScreenHeight)));
+    float radius = std::max(1.0f, unit * 0.28f);
+    float marginX = std::min(radius * 0.45f, (g_ScreenWidth - 1) * 0.5f);
+    float marginY = std::min(radius * 0.45f, (g_ScreenHeight - 1) * 0.5f);
+    if (time == 0 || width != g_ScreenWidth || height != g_ScreenHeight) {
+        width = g_ScreenWidth; height = g_ScreenHeight;
+        hx = FastRandFloat(marginX, width - 1 - marginX);
+        hy = FastRandFloat(marginY, height - 1 - marginY);
+        heading = FastRandFloat(0, Tau);
+        speed = targetSpeed = FastRandFloat(0.04f, 0.16f) * unit;
+        turn = targetTurn = FastRandFloat(-0.8f, 0.8f);
+        remaining = FastRandFloat(1.2f, 3.8f);
+    }
+    remaining -= dt;
+    if (remaining <= 0) {
+        remaining = FastRandFloat(1.2f, 3.8f);
+        targetSpeed = FastRandFloat(0.04f, 0.16f) * unit;
+        targetTurn = FastRandFloat(-0.8f, 0.8f);
+    }
+    float response = 1 - expf(-dt * 1.8f);
+    speed += (targetSpeed - speed) * response;
+    turn += (targetTurn - turn) * response;
+    heading = fmodf(heading + turn * dt, Tau);
+    hx += cosf(heading) * speed * dt;
+    hy += sinf(heading) * speed * dt;
+    if (hx < marginX || hx > width - 1 - marginX) {
+        hx = std::clamp(hx, marginX, width - 1 - marginX);
+        heading = Pi - heading;
+        turn = -turn; targetTurn = -targetTurn;
+    }
+    if (hy < marginY || hy > height - 1 - marginY) {
+        hy = std::clamp(hy, marginY, height - 1 - marginY);
+        heading = -heading;
+        turn = -turn; targetTurn = -targetTurn;
+    }
     int step = RasterStep();
     int left = std::max(0, int(hx - radius)), top = std::max(0, int(hy - radius));
     int right = std::min(g_ScreenWidth, int(hx + radius + 1));

@@ -5,13 +5,16 @@ void EffectInfiniteTunnel(float time, float) {
     // Nested rectangular desktop copies, distinct from the cylindrical warp tunnel.
     constexpr float ratio = 0.76f;
     float phase = fmodf(time * 0.45f, 1.0f);
-    float scale = powf(ratio, phase);
+    // Oversized copies cover the viewport before their borders enter it. At a
+    // phase wrap, each visible layer takes its neighbor's exact size/texture;
+    // the only newly introduced layer is still entirely outside the screen.
+    float scale = powf(ratio, phase - 2);
     int saved = SaveDC(g_hMemDC);
     if (!saved) return;
     SetStretchBltMode(g_hMemDC, COLORONCOLOR);
     float cx = g_ScreenWidth * (0.5f + 0.07f * sinf(time * 0.21f));
     float cy = g_ScreenHeight * (0.5f + 0.06f * cosf(time * 0.17f));
-    for (int layer = 0; layer < 24; ++layer) {
+    for (int layer = -2; layer < 32; ++layer) {
         int w = std::max(1, int(g_ScreenWidth * scale));
         int h = std::max(1, int(g_ScreenHeight * scale));
         int x = int(cx - w * 0.5f), y = int(cy - h * 0.5f);

@@ -120,8 +120,10 @@ Launch with `--menu` to open a native Windows control panel. All payloads start
 - Click a visual's button to turn it on; click again to turn it off.
 - Enable just one to inspect it, or enable several to combine their output.
 - Re-enabling an effect restarts its animation state.
-- Stage-style effects (fireworks, neon patterns, holograms, and the spectrum) use
-  black backgrounds. Shatter, voxel explosion, and Reality Collapse preserve the
+- Fireworks, digital infection, neon patterns, Matrix, holograms, the spectrum,
+  and geometric implosion draw over the incoming image. Fireworks leave fading
+  trails; infection filaments remain until the effect is restarted.
+  Shatter, voxel explosion, and Reality Collapse preserve the
   incoming image as their texture, with black space around the moving pieces.
   A black-backed effect covers earlier layers; effects drawn afterward can still
   appear on top. Ordinary desktop distortions keep their image backgrounds.

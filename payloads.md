@@ -10,9 +10,9 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | --- | --- |
 | Pixel Fireworks | Rockets burst into colorful, falling sparks with fading trails. |
 | Chaos Rectangles | Random architectural panels appear and change across the screen. |
-| Black Hole Singularities | Black holes bend the desktop image around dark centers and glowing rims. |
+| Black Hole Singularities | A randomly placed black hole wanders with smoothly changing random direction and speed, bending the desktop around its dark center and glowing rim. |
 | Desktop Glass Shatter | The desktop breaks into irregular triangular shards with randomized falls and spins. |
-| Living Digital Infection | Branching digital filaments spread across the screen with glowing tips. |
+| Living Digital Infection | Branching digital filaments spread over the desktop with glowing tips and permanent trails until restarted. |
 | Impossible Windows | Moving windows show recursive desktop views with nested title bars. |
 | Liquid Desktop | Gentle intersecting waves distort the desktop with watery highlights. |
 | Pixel Sorting Anomaly | Narrow ribbons rearrange image pixels by color channel. |
@@ -20,7 +20,7 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Ghost Cursor Swarm | Ghost cursors follow the mouse's recent path in a spreading comet trail. |
 | Spatial Portal Network | Paired blue and orange portals show the desktop at each other's locations. |
 | CRT Failure Simulator | Simulates an old failing display with scanlines, interference and horizontal jitter. |
-| Voxel Desktop Explosion | Rectangular desktop fragments become extruded blocks with shaded sides. |
+| Voxel Desktop Explosion | Desktop fragments become extruded blocks with shaded sides, a new random blast direction and randomized fragment paths each loop. |
 | Matrix Reconstruction | Green glyph streams fall independently with bright leading characters. |
 | RGB Spectral Phantoms | Separates and shifts the desktop's red, green and blue channels. |
 | Kaleidoscopic Reality | Mirrors the desktop into six rotating kaleidoscope sectors. |
@@ -39,7 +39,7 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Rotate Screen | Continuously rotates the captured desktop image around its center. |
 | Random Status Icons | Places warning, success, information and error icons at random positions and sizes. |
 | Melting Screen | Stretches the desktop downward in uneven, gravity-driven folds with wet edges and pooling. |
-| Infinite Tunnel | Repeated shrinking desktop copies create an endless rectangular tunnel. |
+| Infinite Tunnel | Repeated shrinking desktop copies enter from beyond the screen edges for a continuous rectangular tunnel without outer-frame popping. |
 | XOR Color Chaos | Animated XOR patterns mix the desktop's colors into moving geometric interference. |
 | Screen Color Inversion | Inverts every desktop color while enabled, without changing display settings. |
 | Popup Cascade | 24 simulated system messages with OS-aware XP, Vista/7, Windows 10 or Windows 11 styling, system fonts, DPI-scaled layouts and status icons; no real dialogs open. |

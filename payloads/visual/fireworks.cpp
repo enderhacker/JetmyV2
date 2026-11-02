@@ -1,4 +1,5 @@
 #include "visual.h"
+#include "trail.h"
 
 namespace VisualPayloads {
 namespace {
@@ -8,8 +9,16 @@ struct Rocket { float x, y, targetY; uint32_t color; };
 void EffectPixelFireworks(float time, float dt) {
     static std::vector<Spark> sparks;
     static std::vector<Rocket> rockets;
+    static TrailCanvas trail;
+    static int width = 0, height = 0;
     static float spawn = 1;
-    if (time == 0) { sparks.clear(); rockets.clear(); spawn = 1; }
+    bool reset = time == 0 || width != g_ScreenWidth || height != g_ScreenHeight;
+    if (reset) {
+        sparks.clear(); rockets.clear(); spawn = 1;
+        width = g_ScreenWidth; height = g_ScreenHeight;
+    }
+    trail.ResetIfNeeded(reset);
+    trail.Fade(dt);
     if (sparks.capacity() < 320) { sparks.reserve(320); rockets.reserve(4); }
     constexpr uint32_t colors[] = {0xFFB454, 0x65E6FF, 0xFF72AB, 0xBAFF86, 0xCE9CFF};
     spawn += dt;
@@ -20,8 +29,9 @@ void EffectPixelFireworks(float time, float dt) {
     }
     for (size_t i = 0; i < rockets.size();) {
         auto& r = rockets[i];
+        float previousY = r.y;
         r.y -= std::max(100.0f, g_ScreenHeight * 0.85f) * dt;
-        Line(int(r.x), int(r.y), int(r.x), int(r.y + 16), r.color);
+        trail.Stroke(int(r.x), int(previousY), int(r.x), int(r.y), r.color, 210);
         if (r.y > r.targetY) { ++i; continue; }
         for (int j = 0; j < 64 && sparks.size() < 320; ++j) {
             float a = j * Tau / 64 + FastRandFloat(-0.035f, 0.035f);
@@ -34,16 +44,20 @@ void EffectPixelFireworks(float time, float dt) {
         auto& p = sparks[i];
         p.age += dt;
         if (p.age >= p.life) { sparks[i] = sparks.back(); sparks.pop_back(); continue; }
+        float previousX = p.x, previousY = p.y;
         p.x += p.vx * dt; p.y += p.vy * dt;
         p.vy += g_ScreenHeight * 0.12f * dt;
         float brightness = 1 - p.age / p.life;
-        for (int tail = 4; tail >= 0; --tail) {
-            float lag = tail * 0.018f;
-            uint32_t color = BlendColor(0x211629, p.color, brightness * (1 - tail * 0.16f));
-            Fill(int(p.x - p.vx * lag), int(p.y - p.vy * lag), 2, 2, color);
-        }
-        Pixel(int(p.x), int(p.y), BlendColor(p.color, 0xFFFFFF, brightness * 0.6f));
+        trail.Stroke(int(previousX), int(previousY), int(p.x), int(p.y),
+            p.color, unsigned(80 + brightness * 175));
         ++i;
+    }
+    trail.Composite();
+    for (const auto& r : rockets)
+        Line(int(r.x), int(r.y), int(r.x), int(r.y + 8), BlendColor(r.color, 0xFFFFFF, 0.45f));
+    for (const auto& p : sparks) {
+        float brightness = 1 - p.age / p.life;
+        Fill(int(p.x), int(p.y), 2, 2, BlendColor(p.color, 0xFFFFFF, brightness * 0.6f));
     }
 }
 }
