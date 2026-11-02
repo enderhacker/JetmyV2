@@ -14,28 +14,103 @@
 #endif
 
 // ============================================================================
+// ULTRA-FAST INLINE PRNG & UTILITIES
+// ============================================================================
+static uint32_t g_FastState = 0x8A5CD791;
+inline uint32_t FastRand() {
+    g_FastState ^= g_FastState << 13;
+    g_FastState ^= g_FastState >> 17;
+    g_FastState ^= g_FastState << 5;
+    return g_FastState;
+}
+inline int FastRandInt(int min, int max) {
+    if (min >= max) return min;
+    return min + static_cast<int>(FastRand() % (max - min + 1));
+}
+inline float FastRandFloat(float min, float max) {
+    return min + (FastRand() * (1.0f / 4294967295.0f)) * (max - min);
+}
+
+// Inline Fast Blend
+inline uint32_t BlendColor(uint32_t c1, uint32_t c2, float t) {
+    uint32_t inv = static_cast<uint32_t>((1.0f - t) * 256.0f);
+    uint32_t w = static_cast<uint32_t>(t * 256.0f);
+
+    uint32_t rb1 = c1 & 0x00FF00FF;
+    uint32_t g1  = c1 & 0x0000FF00;
+    uint32_t rb2 = c2 & 0x00FF00FF;
+    uint32_t g2  = c2 & 0x0000FF00;
+
+    uint32_t rb = ((rb1 * inv + rb2 * w) >> 8) & 0x00FF00FF;
+    uint32_t g  = ((g1 * inv + g2 * w) >> 8) & 0x0000FF00;
+    return rb | g;
+}
+
+// Fast Direct Rasterization Primitives on 32-bit DIB
+inline void FastDrawPixel(uint32_t* buf, int w, int h, int x, int y, uint32_t color) {
+    if (x >= 0 && x < w && y >= 0 && y < h) {
+        buf[y * w + x] = color;
+    }
+}
+
+inline void FastDrawLine(uint32_t* buf, int w, int h, int x0, int y0, int x1, int y1, uint32_t color) {
+    int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy, e2;
+    while (true) {
+        if (x0 >= 0 && x0 < w && y0 >= 0 && y0 < h) buf[y0 * w + x0] = color;
+        if (x0 == x1 && y0 == y1) break;
+        e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+}
+
+inline void FastFillRect(uint32_t* buf, int w, int h, int rx, int ry, int rw, int rh, uint32_t color) {
+    int x0 = (std::max)(0, rx);
+    int y0 = (std::max)(0, ry);
+    int x1 = (std::min)(w, rx + rw);
+    int y1 = (std::min)(h, ry + rh);
+    for (int y = y0; y < y1; ++y) {
+        uint32_t* row = buf + y * w;
+        for (int x = x0; x < x1; ++x) {
+            row[x] = color;
+        }
+    }
+}
+
+inline void FastInvertRect(uint32_t* buf, int w, int h, int rx, int ry, int rw, int rh) {
+    int x0 = (std::max)(0, rx);
+    int y0 = (std::max)(0, ry);
+    int x1 = (std::min)(w, rx + rw);
+    int y1 = (std::min)(h, ry + rh);
+    for (int y = y0; y < y1; ++y) {
+        uint32_t* row = buf + y * w;
+        for (int x = x0; x < x1; ++x) {
+            row[x] = ~row[x] & 0x00FFFFFF;
+        }
+    }
+}
+
+// ============================================================================
 // GLOBAL APPLICATION STATE & PIPELINE BUFFERS
 // ============================================================================
 static bool g_Running = true;
 static int g_ScreenWidth = 0;
 static int g_ScreenHeight = 0;
 
-// Working Composite Buffer (Target)
 static HDC g_hMemDC = nullptr;
 static HBITMAP g_hDIB = nullptr;
 static uint32_t* g_pFramePixels = nullptr;
 
-// Scratch Buffer (Source snapshot for the currently executing payload)
 static HDC g_hScratchDC = nullptr;
 static HBITMAP g_hScratchBmp = nullptr;
 static uint32_t* g_pScratchPixels = nullptr;
 
-// Raw Live Desktop Snapshot
 static HDC g_hBaseDC = nullptr;
 static HBITMAP g_hBaseBmp = nullptr;
 static uint32_t* g_pBasePixels = nullptr;
 
-// History buffer for Effect 18 (Time Echoes)
 struct EchoFrame {
     int w, h;
     std::vector<uint32_t> pixels;
@@ -44,58 +119,37 @@ static const size_t MAX_ECHOES = 16;
 static std::vector<EchoFrame> g_EchoHistory;
 static size_t g_EchoHead = 0;
 
-// PRNG
-static std::mt19937 g_Rng(1337);
-inline int RandInt(int min, int max) {
-    std::uniform_int_distribution<int> d(min, max);
-    return d(g_Rng);
-}
-inline float RandFloat(float min, float max) {
-    std::uniform_real_distribution<float> d(min, max);
-    return d(g_Rng);
-}
-
-inline uint32_t BlendColor(uint32_t c1, uint32_t c2, float t) {
-    float inv = 1.0f - t;
-    uint32_t r = static_cast<uint32_t>(((c1 >> 16) & 0xFF) * inv + ((c2 >> 16) & 0xFF) * t);
-    uint32_t g = static_cast<uint32_t>(((c1 >> 8) & 0xFF) * inv + ((c2 >> 8) & 0xFF) * t);
-    uint32_t b = static_cast<uint32_t>((c1 & 0xFF) * inv + (c2 & 0xFF) * t);
-    return (r << 16) | (g << 8) | b;
-}
-
 // ============================================================================
-// 25 STACKABLE PAYLOAD IMPLEMENTATIONS
-// Each reads from g_hScratchDC / g_pScratchPixels and writes to g_hMemDC / g_pFramePixels
+// 25 OPTIMIZED & HYPER-RANDOMIZED PAYLOADS
 // ============================================================================
 
 // 1. PIXEL FIREWORKS
-struct FireworkParticle { float x, y, vx, vy; uint32_t color; float life; };
-static std::vector<FireworkParticle> g_Fireworks;
+struct Particle { float x, y, vx, vy; uint32_t col; float life; };
+static std::vector<Particle> g_Fireworks;
 
 void EffectPixelFireworks(float time, float dt) {
-    if (RandInt(0, 12) == 0 || g_Fireworks.empty()) {
-        float ox = RandFloat(g_ScreenWidth * 0.1f, g_ScreenWidth * 0.9f);
-        float oy = RandFloat(g_ScreenHeight * 0.1f, g_ScreenHeight * 0.7f);
-        uint32_t col = RGB(RandInt(80, 255), RandInt(80, 255), RandInt(80, 255));
-        for (int i = 0; i < 40; ++i) {
-            float ang = RandFloat(0, 6.28318f);
-            float spd = RandFloat(60.0f, 300.0f);
-            g_Fireworks.push_back({ ox, oy, cosf(ang) * spd, sinf(ang) * spd, col, RandFloat(0.4f, 1.2f) });
+    if (FastRandInt(0, 5) == 0 || g_Fireworks.empty()) {
+        float ox = FastRandFloat(g_ScreenWidth * 0.05f, g_ScreenWidth * 0.95f);
+        float oy = FastRandFloat(g_ScreenHeight * 0.05f, g_ScreenHeight * 0.65f);
+        uint32_t col = (FastRand() & 0x00FFFFFF) | 0x00404040;
+        int count = FastRandInt(30, 70);
+        float baseSpd = FastRandFloat(100.0f, 450.0f);
+        for (int i = 0; i < count; ++i) {
+            float ang = FastRandFloat(0.0f, 6.28318f);
+            float spd = baseSpd * FastRandFloat(0.3f, 1.2f);
+            g_Fireworks.push_back({ ox, oy, cosf(ang) * spd, sinf(ang) * spd, col, FastRandFloat(0.4f, 1.4f) });
         }
     }
     for (size_t i = 0; i < g_Fireworks.size();) {
         auto& p = g_Fireworks[i];
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.vy += 260.0f * dt;
+        p.vy += 320.0f * dt;
         p.life -= dt;
         int ix = static_cast<int>(p.x);
         int iy = static_cast<int>(p.y);
-        if (p.life > 0 && ix >= 0 && ix < g_ScreenWidth - 3 && iy >= 0 && iy < g_ScreenHeight - 3) {
-            RECT r = { ix, iy, ix + 3, iy + 3 };
-            HBRUSH b = CreateSolidBrush(p.color);
-            FillRect(g_hMemDC, &r, b);
-            DeleteObject(b);
+        if (p.life > 0.0f && ix >= 0 && ix < g_ScreenWidth - 2 && iy >= 0 && iy < g_ScreenHeight - 2) {
+            FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, ix, iy, 3, 3, p.col);
             ++i;
         } else {
             g_Fireworks[i] = g_Fireworks.back();
@@ -106,39 +160,51 @@ void EffectPixelFireworks(float time, float dt) {
 
 // 2. CHAOS RECTANGLES
 void EffectChaosRectangles(float time, float dt) {
-    for (int i = 0; i < 15; ++i) {
-        int w = RandInt(30, 200);
-        int h = RandInt(30, 200);
-        int x = RandInt(0, g_ScreenWidth - w);
-        int y = RandInt(0, g_ScreenHeight - h);
-        if (i % 2 == 0) {
-            PatBlt(g_hMemDC, x, y, w, h, DSTINVERT);
+    int rectCount = FastRandInt(10, 25);
+    for (int i = 0; i < rectCount; ++i) {
+        int w = FastRandInt(20, 260);
+        int h = FastRandInt(20, 260);
+        int x = FastRandInt(0, g_ScreenWidth - w);
+        int y = FastRandInt(0, g_ScreenHeight - h);
+        int mode = FastRandInt(0, 3);
+        if (mode == 0) {
+            FastInvertRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x, y, w, h);
+        } else if (mode == 1) {
+            FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x, y, w, h, FastRand() & 0x00FFFFFF);
         } else {
-            HBRUSH b = CreateSolidBrush(RGB(RandInt(0, 255), RandInt(0, 255), RandInt(0, 255)));
-            RECT r = { x, y, x + w, y + h };
-            FrameRect(g_hMemDC, &r, b);
-            DeleteObject(b);
+            uint32_t col = FastRand() & 0x00FFFFFF;
+            FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x, y, x + w, y, col);
+            FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x + w, y, x + w, y + h, col);
+            FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x + w, y + h, x, y + h, col);
+            FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, x, y + h, x, y, col);
         }
     }
 }
 
-// 3. BLACK HOLE SINGULARITIES
+// 3. BLACK HOLE SINGULARITIES (Bounded Optimization)
 void EffectBlackHoleSingularities(float time, float dt) {
-    float hx = g_ScreenWidth * (0.5f + 0.3f * sinf(time * 1.4f));
-    float hy = g_ScreenHeight * (0.5f + 0.25f * cosf(time * 1.1f));
-    float radius = 220.0f;
-    float twist = 3.5f;
+    float hx = g_ScreenWidth * (0.5f + 0.35f * sinf(time * 1.8f + 1.2f));
+    float hy = g_ScreenHeight * (0.5f + 0.30f * cosf(time * 1.3f));
+    float radius = 220.0f + 40.0f * sinf(time * 3.0f);
+    float twist = 4.2f + sinf(time * 2.0f) * 1.5f;
 
-    for (int y = 0; y < g_ScreenHeight; y += 2) {
+    int minX = (std::max)(0, static_cast<int>(hx - radius));
+    int maxX = (std::min)(g_ScreenWidth - 2, static_cast<int>(hx + radius));
+    int minY = (std::max)(0, static_cast<int>(hy - radius));
+    int maxY = (std::min)(g_ScreenHeight - 2, static_cast<int>(hy + radius));
+
+    float radSq = radius * radius;
+    for (int y = minY; y <= maxY; y += 2) {
         float dy = y - hy;
         int rowIdx = y * g_ScreenWidth;
-        for (int x = 0; x < g_ScreenWidth; x += 2) {
+        for (int x = minX; x <= maxX; x += 2) {
             float dx = x - hx;
-            float dist = sqrtf(dx * dx + dy * dy);
-            if (dist < radius) {
+            float distSq = dx * dx + dy * dy;
+            if (distSq < radSq) {
+                float dist = sqrtf(distSq);
                 float factor = 1.0f - (dist / radius);
                 float a = atan2f(dy, dx) + factor * twist;
-                float newDist = dist * (1.0f - factor * 0.45f);
+                float newDist = dist * (1.0f - factor * 0.55f);
                 int sx = std::clamp(static_cast<int>(hx + cosf(a) * newDist), 0, g_ScreenWidth - 1);
                 int sy = std::clamp(static_cast<int>(hy + sinf(a) * newDist), 0, g_ScreenHeight - 1);
                 uint32_t col = g_pScratchPixels[sy * g_ScreenWidth + sx];
@@ -152,90 +218,105 @@ void EffectBlackHoleSingularities(float time, float dt) {
 }
 
 // 4. DESKTOP GLASS SHATTER
+struct Shard { int sx, sy, w, h; float vx, vy; };
+static std::vector<Shard> g_Shards;
+
 void EffectDesktopGlassShatter(float time, float dt) {
-    int cols = 8, rows = 6;
-    int sw = g_ScreenWidth / cols;
-    int sh = g_ScreenHeight / rows;
-    float cycle = fmodf(time, 3.5f);
-    for (int r = 0; r < rows; ++r) {
-        for (int c = 0; c < cols; ++c) {
-            float delay = (c * 0.06f) + (r * 0.1f);
-            float t = (std::max)(0.0f, cycle - delay);
-            int drop = static_cast<int>(0.5f * 800.0f * t * t);
-            if (drop > 0) {
-                int sx = c * sw, sy = r * sh;
-                int dy = (std::min)(g_ScreenHeight - sh, sy + drop);
-                BitBlt(g_hMemDC, sx, dy, sw - 3, sh - 3, g_hScratchDC, sx, sy, SRCCOPY);
+    if (g_Shards.empty() || fmodf(time, 4.0f) < dt) {
+        g_Shards.clear();
+        int cols = 9, rows = 7;
+        int sw = g_ScreenWidth / cols;
+        int sh = g_ScreenHeight / rows;
+        for (int r = 0; r < rows; ++r) {
+            for (int c = 0; c < cols; ++c) {
+                g_Shards.push_back({ c * sw, r * sh, sw, sh, FastRandFloat(-120.0f, 120.0f), FastRandFloat(40.0f, 280.0f) });
             }
         }
     }
+    float cycle = fmodf(time, 4.0f);
+    for (auto& s : g_Shards) {
+        int dx = std::clamp(static_cast<int>(s.sx + s.vx * cycle), 0, g_ScreenWidth - s.w);
+        int dy = std::clamp(static_cast<int>(s.sy + s.vy * cycle * cycle), 0, g_ScreenHeight - s.h);
+        BitBlt(g_hMemDC, dx, dy, s.w - 4, s.h - 4, g_hScratchDC, s.sx, s.sy, SRCCOPY);
+    }
 }
 
-// 5. LIVING DIGITAL INFECTION
+// 5. LIVING DIGITAL INFECTION (Direct Fast Lines)
 void EffectLivingInfection(float time, float dt) {
-    HPEN pen = CreatePen(PS_SOLID, 2, RGB(0, 255, 120));
-    HGDIOBJ old = SelectObject(g_hMemDC, pen);
-    int nodes = static_cast<int>(fmodf(time * 40.0f, 250.0f)) + 10;
-    std::mt19937 tempRng(444);
-    for (int root = 0; root < 4; ++root) {
-        int cx = (root * g_ScreenWidth) / 3;
-        int cy = (root % 2 == 0) ? 0 : g_ScreenHeight;
-        MoveToEx(g_hMemDC, cx, cy, NULL);
-        for (int i = 0; i < nodes; ++i) {
-            cx += std::uniform_int_distribution<int>(-18, 18)(tempRng);
-            cy += std::uniform_int_distribution<int>((root % 2 == 0) ? 4 : -4, (root % 2 == 0) ? 22 : -22)(tempRng);
-            LineTo(g_hMemDC, cx, cy);
+    int roots = 5;
+    uint32_t colors[] = { 0x0000FF7F, 0x00FF0055, 0x0000E5FF, 0x00FFD700, 0x009900FF };
+    for (int root = 0; root < roots; ++root) {
+        int cx = FastRandInt(0, g_ScreenWidth);
+        int cy = (root % 2 == 0) ? 0 : g_ScreenHeight - 1;
+        uint32_t col = colors[root % 5];
+        for (int i = 0; i < 40; ++i) {
+            int nx = cx + FastRandInt(-22, 22);
+            int ny = cy + ((root % 2 == 0) ? FastRandInt(6, 26) : FastRandInt(-26, -6));
+            FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, cx, cy, nx, ny, col);
+            cx = nx; cy = ny;
         }
     }
-    SelectObject(g_hMemDC, old);
-    DeleteObject(pen);
 }
 
 // 6. IMPOSSIBLE WINDOWS
-struct FakeWin { float x, y, vx, vy; int w, h; const char* title; };
-static std::vector<FakeWin> g_FakeWindows = {
-    { 120, 120, 160, 120, 260, 170, "Stack_Overflow.exe" },
-    { 600, 220, -140, 150, 230, 150, "Memory_Fault" },
-    { 400, 500, 170, -130, 280, 180, "Kernel_Interrupt" }
-};
+struct GlitchWin { float x, y, vx, vy; int w, h; const char* title; uint32_t col; };
+static std::vector<GlitchWin> g_GlitchWins;
 
 void EffectImpossibleWindows(float time, float dt) {
-    for (auto& w : g_FakeWindows) {
+    static const char* titles[] = {
+        "CRITICAL_PROCESS_DIED", "PAGE_FAULT_IN_NONPAGED_AREA",
+        "SYSTEM_SERVICE_EXCEPTION", "STACK_HASH_CORRUPTION",
+        "QUANTUM_CORE_HALTED", "HEAP_SEGMENT_OVERFLOW"
+    };
+    if (g_GlitchWins.empty()) {
+        for (int i = 0; i < 5; ++i) {
+            g_GlitchWins.push_back({
+                FastRandFloat(50, g_ScreenWidth - 350), FastRandFloat(50, g_ScreenHeight - 250),
+                FastRandFloat(-250.0f, 250.0f), FastRandFloat(-220.0f, 220.0f),
+                FastRandInt(220, 340), FastRandInt(140, 220),
+                titles[i % 6],
+                (FastRand() & 0x007F1F1F) | 0x00800000
+            });
+        }
+    }
+    for (auto& w : g_GlitchWins) {
         w.x += w.vx * dt;
         w.y += w.vy * dt;
-        if (w.x < 0) { w.x = 0; w.vx = -w.vx; }
-        if (w.x + w.w > g_ScreenWidth) { w.x = static_cast<float>(g_ScreenWidth - w.w); w.vx = -w.vx; }
-        if (w.y < 0) { w.y = 0; w.vy = -w.vy; }
-        if (w.y + w.h > g_ScreenHeight) { w.y = static_cast<float>(g_ScreenHeight - w.h); w.vy = -w.vy; }
+        if (w.x < 0 || w.x + w.w > g_ScreenWidth) { w.vx = -w.vx; w.x = std::clamp(w.x, 0.0f, (float)(g_ScreenWidth - w.w)); }
+        if (w.y < 0 || w.y + w.h > g_ScreenHeight) { w.vy = -w.vy; w.y = std::clamp(w.y, 0.0f, (float)(g_ScreenHeight - w.h)); }
 
         int ix = static_cast<int>(w.x), iy = static_cast<int>(w.y);
-        RECT r = { ix, iy, ix + w.w, iy + w.h };
-        FillRect(g_hMemDC, &r, (HBRUSH)GetStockObject(DKGRAY_BRUSH));
-        RECT rt = { ix, iy, ix + w.w, iy + 22 };
-        HBRUSH tb = CreateSolidBrush(RGB(190, 25, 35));
-        FillRect(g_hMemDC, &rt, tb);
-        DeleteObject(tb);
+        FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, ix, iy, w.w, 24, w.col);
+        FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, ix, iy + 24, w.w, w.h - 24, 0x001A1A1A);
 
         SetBkMode(g_hMemDC, TRANSPARENT);
         SetTextColor(g_hMemDC, RGB(255, 255, 255));
-        TextOutA(g_hMemDC, ix + 6, iy + 3, w.title, static_cast<int>(strlen(w.title)));
-
-        SetStretchBltMode(g_hMemDC, COLORONCOLOR);
-        StretchBlt(g_hMemDC, ix + 3, iy + 24, w.w - 6, w.h - 27, g_hScratchDC, 0, 0, g_ScreenWidth, g_ScreenHeight, SRCCOPY);
+        TextOutA(g_hMemDC, ix + 8, iy + 4, w.title, static_cast<int>(strlen(w.title)));
+        StretchBlt(g_hMemDC, ix + 2, iy + 26, w.w - 4, w.h - 28, g_hScratchDC, ix % 100, iy % 100, g_ScreenWidth / 3, g_ScreenHeight / 3, SRCCOPY);
     }
 }
 
-// 7. LIQUID DESKTOP
+// 7. LIQUID DESKTOP (Precomputed 1D Wave Lookup)
 void EffectLiquidDesktop(float time, float dt) {
-    float waveSpeed = 7.0f;
-    float waveFreq = 0.03f;
+    float waveSpeed = 6.5f;
+    float freqX = 0.024f + 0.006f * sinf(time * 0.7f);
+    float freqY = 0.028f + 0.005f * cosf(time * 0.9f);
+
+    std::vector<int> xShifts(g_ScreenHeight);
+    for (int y = 0; y < g_ScreenHeight; ++y) {
+        xShifts[y] = static_cast<int>(sinf((y * freqX) + (time * waveSpeed)) * 18.0f);
+    }
+    std::vector<int> yShifts(g_ScreenWidth);
+    for (int x = 0; x < g_ScreenWidth; ++x) {
+        yShifts[x] = static_cast<int>(cosf((x * freqY) + (time * waveSpeed)) * 14.0f);
+    }
+
     for (int y = 0; y < g_ScreenHeight; y += 2) {
+        int xShift = xShifts[y];
         int rowIdx = y * g_ScreenWidth;
         for (int x = 0; x < g_ScreenWidth; x += 2) {
-            int xShift = static_cast<int>(sinf((y * waveFreq) + (time * waveSpeed)) * 16.0f);
-            int yShift = static_cast<int>(cosf((x * waveFreq) + (time * waveSpeed)) * 12.0f);
             int sx = std::clamp(x + xShift, 0, g_ScreenWidth - 1);
-            int sy = std::clamp(y + yShift, 0, g_ScreenHeight - 1);
+            int sy = std::clamp(y + yShifts[x], 0, g_ScreenHeight - 1);
             uint32_t col = g_pScratchPixels[sy * g_ScreenWidth + sx];
             g_pFramePixels[rowIdx + x] = col;
             g_pFramePixels[rowIdx + x + 1] = col;
@@ -247,43 +328,51 @@ void EffectLiquidDesktop(float time, float dt) {
 
 // 8. PIXEL SORTING ANOMALY
 void EffectPixelSortingAnomaly(float time, float dt) {
-    for (int b = 0; b < 8; ++b) {
-        int boxW = RandInt(100, 300);
-        int boxH = RandInt(30, 100);
-        int sx = RandInt(0, g_ScreenWidth - boxW);
-        int sy = RandInt(0, g_ScreenHeight - boxH);
+    int bands = FastRandInt(6, 14);
+    for (int b = 0; b < bands; ++b) {
+        int boxW = FastRandInt(80, 350);
+        int boxH = FastRandInt(20, 80);
+        int sx = FastRandInt(0, g_ScreenWidth - boxW);
+        int sy = FastRandInt(0, g_ScreenHeight - boxH);
+        int sortMode = FastRandInt(0, 2);
+
         for (int y = sy; y < sy + boxH; ++y) {
             uint32_t* row = g_pFramePixels + (y * g_ScreenWidth) + sx;
-            std::sort(row, row + boxW, [](uint32_t a, uint32_t b) {
-                return (a & 0xFF) < (b & 0xFF);
-            });
+            if (sortMode == 0) {
+                std::sort(row, row + boxW, [](uint32_t a, uint32_t b) { return (a & 0xFF) < (b & 0xFF); });
+            } else if (sortMode == 1) {
+                std::sort(row, row + boxW, [](uint32_t a, uint32_t b) { return ((a >> 16) & 0xFF) > ((b >> 16) & 0xFF); });
+            } else {
+                std::sort(row, row + boxW, [](uint32_t a, uint32_t b) { return ((a >> 8) & 0xFF) < ((b >> 8) & 0xFF); });
+            }
         }
     }
 }
 
 // 9. NEON FRACTAL INVASION
 void EffectNeonFractalInvasion(float time, float dt) {
-    float cr = -0.7f + sinf(time * 0.4f) * 0.08f;
-    float ci = 0.27f + cosf(time * 0.3f) * 0.08f;
-    for (int y = 0; y < g_ScreenHeight; y += 2) {
-        float zy0 = 1.4f * (y - g_ScreenHeight / 2) / (0.5f * g_ScreenHeight);
+    float cr = -0.72f + sinf(time * 0.45f) * 0.12f;
+    float ci = 0.26f + cosf(time * 0.35f) * 0.12f;
+    for (int y = 0; y < g_ScreenHeight; y += 3) {
+        float zy0 = 1.3f * (y - g_ScreenHeight / 2) / (0.5f * g_ScreenHeight);
         int rowIdx = y * g_ScreenWidth;
-        for (int x = 0; x < g_ScreenWidth; x += 2) {
-            float zx = 1.4f * (x - g_ScreenWidth / 2) / (0.5f * g_ScreenHeight);
+        for (int x = 0; x < g_ScreenWidth; x += 3) {
+            float zx = 1.3f * (x - g_ScreenWidth / 2) / (0.5f * g_ScreenHeight);
             float zy = zy0;
-            int i = 16;
+            int i = 14;
             while (zx * zx + zy * zy < 4.0f && i > 0) {
                 float tmp = zx * zx - zy * zy + cr;
                 zy = 2.0f * zx * zy + ci;
                 zx = tmp;
                 --i;
             }
-            uint32_t neon = (i == 0) ? 0x000000 : ((i * 15) << 16) | ((i * 8) << 8) | (i * 26);
-            uint32_t col = BlendColor(g_pScratchPixels[rowIdx + x], neon, 0.5f);
-            g_pFramePixels[rowIdx + x] = col;
-            g_pFramePixels[rowIdx + x + 1] = col;
-            g_pFramePixels[rowIdx + g_ScreenWidth + x] = col;
-            g_pFramePixels[rowIdx + g_ScreenWidth + x + 1] = col;
+            uint32_t neon = (i == 0) ? 0x000000 : ((i * 18) << 16) | ((i * 10) << 8) | (i * 24);
+            uint32_t col = BlendColor(g_pScratchPixels[rowIdx + x], neon, 0.45f);
+            for (int dy = 0; dy < 3 && y + dy < g_ScreenHeight; ++dy) {
+                for (int dx = 0; dx < 3 && x + dx < g_ScreenWidth; ++dx) {
+                    g_pFramePixels[(y + dy) * g_ScreenWidth + (x + dx)] = col;
+                }
+            }
         }
     }
 }
@@ -292,9 +381,10 @@ void EffectNeonFractalInvasion(float time, float dt) {
 void EffectGhostCursorSwarm(float time, float dt) {
     POINT p; GetCursorPos(&p);
     HCURSOR hArr = LoadCursor(NULL, IDC_ARROW);
-    for (int i = 0; i < 28; ++i) {
-        float a = time * 3.0f + (i * 0.45f);
-        float r = 40.0f + (i * 16.0f);
+    int count = 32;
+    for (int i = 0; i < count; ++i) {
+        float a = time * 3.2f + (i * 0.35f) + sinf(time + i);
+        float r = 30.0f + (i * 18.0f) + 15.0f * sinf(time * 2.0f + i);
         int cx = static_cast<int>(p.x + cosf(a) * r);
         int cy = static_cast<int>(p.y + sinf(a) * r);
         DrawIcon(g_hMemDC, cx, cy, hArr);
@@ -303,58 +393,70 @@ void EffectGhostCursorSwarm(float time, float dt) {
 
 // 11. SPATIAL PORTAL NETWORK
 void EffectSpatialPortalNetwork(float time, float dt) {
-    int portalRadius = 110;
     for (int i = 0; i < 3; ++i) {
-        int cx = static_cast<int>(g_ScreenWidth * 0.5f + cosf(time * 1.4f + i * 2.0f) * (g_ScreenWidth * 0.35f));
-        int cy = static_cast<int>(g_ScreenHeight * 0.5f + sinf(time * 1.6f + i * 2.0f) * (g_ScreenHeight * 0.3f));
-        int srcX = (cx + 400) % (g_ScreenWidth - portalRadius * 2);
-        int srcY = (cy + 300) % (g_ScreenHeight - portalRadius * 2);
+        int radius = 90 + static_cast<int>(25.0f * sinf(time * 2.0f + i));
+        int cx = static_cast<int>(g_ScreenWidth * 0.5f + cosf(time * 1.5f + i * 2.1f) * (g_ScreenWidth * 0.35f));
+        int cy = static_cast<int>(g_ScreenHeight * 0.5f + sinf(time * 1.7f + i * 1.9f) * (g_ScreenHeight * 0.3f));
+        int srcX = (cx + 350 + i * 120) % (g_ScreenWidth - radius * 2);
+        int srcY = (cy + 250 + i * 90) % (g_ScreenHeight - radius * 2);
 
-        HRGN hRgn = CreateEllipticRgn(cx - portalRadius, cy - portalRadius, cx + portalRadius, cy + portalRadius);
-        SelectClipRgn(g_hMemDC, hRgn);
-        BitBlt(g_hMemDC, cx - portalRadius, cy - portalRadius, portalRadius * 2, portalRadius * 2, g_hScratchDC, srcX, srcY, SRCCOPY);
-        SelectClipRgn(g_hMemDC, NULL);
-        DeleteObject(hRgn);
+        int minX = (std::max)(0, cx - radius), maxX = (std::min)(g_ScreenWidth - 1, cx + radius);
+        int minY = (std::max)(0, cy - radius), maxY = (std::min)(g_ScreenHeight - 1, cy + radius);
+        int rSq = radius * radius;
 
-        HPEN pen = CreatePen(PS_SOLID, 3, RGB(0, 220, 255));
-        HGDIOBJ old = SelectObject(g_hMemDC, pen);
-        SelectObject(g_hMemDC, GetStockObject(NULL_BRUSH));
-        Ellipse(g_hMemDC, cx - portalRadius, cy - portalRadius, cx + portalRadius, cy + portalRadius);
-        SelectObject(g_hMemDC, old);
-        DeleteObject(pen);
+        for (int y = minY; y <= maxY; ++y) {
+            int dy = y - cy;
+            for (int x = minX; x <= maxX; ++x) {
+                int dx = x - cx;
+                int dSq = dx * dx + dy * dy;
+                if (dSq <= rSq) {
+                    if (abs(dSq - rSq) < (radius * 4)) {
+                        g_pFramePixels[y * g_ScreenWidth + x] = 0x0000E5FF;
+                    } else {
+                        int sx = srcX + (dx + radius);
+                        int sy = srcY + (dy + radius);
+                        g_pFramePixels[y * g_ScreenWidth + x] = g_pScratchPixels[sy * g_ScreenWidth + sx];
+                    }
+                }
+            }
+        }
     }
 }
 
 // 12. CRT FAILURE SIMULATOR
 void EffectCRTFailureSimulator(float time, float dt) {
-    int roll = static_cast<int>(fmodf(time * 260.0f, static_cast<float>(g_ScreenHeight)));
-    int jitter = RandInt(-6, 6);
+    int roll = static_cast<int>(fmodf(time * 300.0f, static_cast<float>(g_ScreenHeight)));
+    int jitter = FastRandInt(-8, 8);
+
     BitBlt(g_hMemDC, jitter, roll, g_ScreenWidth, g_ScreenHeight - roll, g_hScratchDC, 0, 0, SRCCOPY);
     BitBlt(g_hMemDC, jitter, 0, g_ScreenWidth, roll, g_hScratchDC, 0, g_ScreenHeight - roll, SRCCOPY);
 
-    for (int y = 0; y < g_ScreenHeight; y += 4) {
+    for (int y = 0; y < g_ScreenHeight; y += 3) {
         uint32_t* row = g_pFramePixels + (y * g_ScreenWidth);
+        uint32_t noise = (FastRand() & 0x001F1F1F);
         for (int x = 0; x < g_ScreenWidth; ++x) {
-            row[x] = (row[x] & 0x007F7F7F) + ((RandInt(0, 20)) << 16);
+            row[x] = ((row[x] & 0x00FEFEFE) >> 1) + noise;
         }
     }
 }
 
 // 13. VOXEL DESKTOP EXPLOSION
 void EffectVoxelDesktopExplosion(float time, float dt) {
-    int cols = 10, rows = 8;
+    int cols = 12, rows = 9;
     int bw = g_ScreenWidth / cols;
     int bh = g_ScreenHeight / rows;
-    float t = fmodf(time * 1.5f, 3.0f);
+    float t = fmodf(time * 1.8f, 3.0f);
 
     for (int r = 0; r < rows; ++r) {
         for (int c = 0; c < cols; ++c) {
-            float distFromCenter = sqrtf(powf(c - cols * 0.5f, 2) + powf(r - rows * 0.5f, 2));
-            float z = 1.0f + (t * (distFromCenter * 0.2f));
-            int curW = static_cast<int>(bw * z);
-            int curH = static_cast<int>(bh * z);
-            int curX = static_cast<int>(c * bw + (c - cols * 0.5f) * t * 25.0f);
-            int curY = static_cast<int>(r * bh + (r - rows * 0.5f) * t * 25.0f);
+            float dc = c - cols * 0.5f;
+            float dr = r - rows * 0.5f;
+            float dist = sqrtf(dc * dc + dr * dr);
+            float scale = 1.0f + (t * (dist * 0.22f));
+            int curW = static_cast<int>(bw * scale);
+            int curH = static_cast<int>(bh * scale);
+            int curX = static_cast<int>(c * bw + dc * t * 30.0f);
+            int curY = static_cast<int>(r * bh + dr * t * 30.0f);
 
             SetStretchBltMode(g_hMemDC, COLORONCOLOR);
             StretchBlt(g_hMemDC, curX, curY, curW, curH, g_hScratchDC, c * bw, r * bh, bw, bh, SRCCOPY);
@@ -364,38 +466,42 @@ void EffectVoxelDesktopExplosion(float time, float dt) {
 
 // 14. MATRIX RECONSTRUCTION
 void EffectMatrixReconstruction(float time, float dt) {
-    for (int i = 0; i < g_ScreenWidth * g_ScreenHeight; i += 2) {
-        g_pFramePixels[i] = ((g_pFramePixels[i] & 0x00FEFEFE) >> 1);
+    for (int i = 0; i < g_ScreenWidth * g_ScreenHeight; i += 3) {
+        g_pFramePixels[i] = (g_pFramePixels[i] & 0x007F7F7F);
     }
     SetBkMode(g_hMemDC, TRANSPARENT);
-    SetTextColor(g_hMemDC, RGB(40, 255, 90));
-    const char glyphs[] = "0123456789ABCDEF$#@%&*";
-    for (int col = 0; col < g_ScreenWidth; col += 32) {
-        int streamHead = static_cast<int>(fmodf(time * 350.0f + col * 21.0f, g_ScreenHeight + 300.0f)) - 150;
-        for (int step = 0; step < 8; ++step) {
+    SetTextColor(g_hMemDC, RGB(40, 255, 120));
+    const char glyphs[] = "0123456789ABCDEF$#@%&*+-=";
+    for (int col = 0; col < g_ScreenWidth; col += 24) {
+        int streamHead = static_cast<int>(fmodf(time * 420.0f + col * 27.0f, g_ScreenHeight + 350.0f)) - 160;
+        for (int step = 0; step < 9; ++step) {
             int y = streamHead - step * 18;
             if (y >= 0 && y < g_ScreenHeight - 18) {
-                char ch = glyphs[(col + step + static_cast<int>(time * 10)) % (sizeof(glyphs) - 1)];
+                char ch = glyphs[(col + step + static_cast<int>(time * 15)) % (sizeof(glyphs) - 1)];
                 TextOutA(g_hMemDC, col, y, &ch, 1);
             }
         }
     }
 }
 
-// 15. RGB SPECTRAL PHANTOMS
+// 15. RGB SPECTRAL PHANTOMS (Chromatic Aberration)
 void EffectRGBSpectralPhantoms(float time, float dt) {
-    int shiftR_x = static_cast<int>(sinf(time * 3.2f) * 25.0f);
-    int shiftB_x = static_cast<int>(-cosf(time * 2.8f) * 25.0f);
+    int shiftR_x = static_cast<int>(sinf(time * 3.5f) * 28.0f);
+    int shiftR_y = static_cast<int>(cosf(time * 2.8f) * 8.0f);
+    int shiftB_x = static_cast<int>(-cosf(time * 3.1f) * 28.0f);
+    int shiftB_y = static_cast<int>(-sinf(time * 2.4f) * 8.0f);
 
     for (int y = 0; y < g_ScreenHeight; ++y) {
+        int yR = std::clamp(y + shiftR_y, 0, g_ScreenHeight - 1);
+        int yB = std::clamp(y + shiftB_y, 0, g_ScreenHeight - 1);
         int rowIdx = y * g_ScreenWidth;
         for (int x = 0; x < g_ScreenWidth; ++x) {
             int xR = std::clamp(x + shiftR_x, 0, g_ScreenWidth - 1);
             int xB = std::clamp(x + shiftB_x, 0, g_ScreenWidth - 1);
 
-            uint32_t colR = g_pScratchPixels[rowIdx + xR];
+            uint32_t colR = g_pScratchPixels[yR * g_ScreenWidth + xR];
             uint32_t colG = g_pScratchPixels[rowIdx + x];
-            uint32_t colB = g_pScratchPixels[rowIdx + xB];
+            uint32_t colB = g_pScratchPixels[yB * g_ScreenWidth + xB];
 
             g_pFramePixels[rowIdx + x] = (colR & 0x00FF0000) | (colG & 0x0000FF00) | (colB & 0x000000FF);
         }
@@ -404,8 +510,8 @@ void EffectRGBSpectralPhantoms(float time, float dt) {
 
 // 16. KALEIDOSCOPIC REALITY
 void EffectKaleidoscopicReality(float time, float dt) {
-    int cx = static_cast<int>(g_ScreenWidth * 0.5f + cosf(time * 1.7f) * (g_ScreenWidth * 0.2f));
-    int cy = static_cast<int>(g_ScreenHeight * 0.5f + sinf(time * 1.5f) * (g_ScreenHeight * 0.15f));
+    int cx = static_cast<int>(g_ScreenWidth * 0.5f + cosf(time * 1.8f) * (g_ScreenWidth * 0.22f));
+    int cy = static_cast<int>(g_ScreenHeight * 0.5f + sinf(time * 1.6f) * (g_ScreenHeight * 0.18f));
 
     for (int y = 0; y < g_ScreenHeight; y += 2) {
         int dy = abs(y - cy);
@@ -424,23 +530,32 @@ void EffectKaleidoscopicReality(float time, float dt) {
 }
 
 // 17. GRAVITY PAINT
-struct PaintDrop { float x, y, vy; uint32_t col; };
+struct PaintDrop { float x, y, vy; uint32_t col; int thickness; };
 static std::vector<PaintDrop> g_Paint;
 
 void EffectGravityPaint(float time, float dt) {
-    if (g_Paint.size() < 25) {
-        g_Paint.push_back({ RandFloat(0, static_cast<float>(g_ScreenWidth)), 0, RandFloat(90, 240),
-            static_cast<uint32_t>(RGB(RandInt(120, 255), RandInt(0, 255), RandInt(120, 255))) });
+    if (g_Paint.size() < 35) {
+        g_Paint.push_back({
+            FastRandFloat(0, static_cast<float>(g_ScreenWidth)), 0,
+            FastRandFloat(120.0f, 380.0f),
+            (FastRand() & 0x00FFFFFF) | 0x00550055,
+            FastRandInt(1, 3)
+        });
     }
     for (auto& p : g_Paint) {
         p.y += p.vy * dt;
-        if (p.y > g_ScreenHeight - 5) p.y = 0;
+        if (p.y > g_ScreenHeight - 5) {
+            p.y = 0;
+            p.x = FastRandFloat(0, static_cast<float>(g_ScreenWidth));
+        }
         int ix = static_cast<int>(p.x);
         int iy = static_cast<int>(p.y);
-        for (int trail = 0; trail < 18; ++trail) {
+        for (int trail = 0; trail < 24; ++trail) {
             int ty = iy - trail;
-            if (ty >= 0 && ty < g_ScreenHeight && ix >= 0 && ix < g_ScreenWidth) {
-                g_pFramePixels[ty * g_ScreenWidth + ix] = p.col;
+            if (ty >= 0 && ty < g_ScreenHeight) {
+                for (int tx = 0; tx < p.thickness; ++tx) {
+                    if (ix + tx < g_ScreenWidth) g_pFramePixels[ty * g_ScreenWidth + (ix + tx)] = p.col;
+                }
             }
         }
     }
@@ -468,8 +583,8 @@ void EffectDesktopTimeEchoes(float time, float dt) {
 
 // 19. 3D WARP TUNNEL
 void Effect3DWarpTunnel(float time, float dt) {
-    float cx = g_ScreenWidth * 0.5f + cosf(time * 1.8f) * (g_ScreenWidth * 0.15f);
-    float cy = g_ScreenHeight * 0.5f + sinf(time * 1.4f) * (g_ScreenHeight * 0.15f);
+    float cx = g_ScreenWidth * 0.5f + cosf(time * 2.0f) * (g_ScreenWidth * 0.18f);
+    float cy = g_ScreenHeight * 0.5f + sinf(time * 1.5f) * (g_ScreenHeight * 0.18f);
     for (int y = 0; y < g_ScreenHeight; y += 2) {
         float dy = y - cy;
         int rowIdx = y * g_ScreenWidth;
@@ -478,7 +593,7 @@ void Effect3DWarpTunnel(float time, float dt) {
             float r = sqrtf(dx * dx + dy * dy) + 0.1f;
             float a = atan2f(dy, dx);
             int u = static_cast<int>(abs(a * g_ScreenWidth / 3.14159f)) % g_ScreenWidth;
-            int v = static_cast<int>(abs((2500.0f / r) + (time * 600.0f))) % g_ScreenHeight;
+            int v = static_cast<int>(abs((2600.0f / r) + (time * 700.0f))) % g_ScreenHeight;
             uint32_t col = g_pScratchPixels[v * g_ScreenWidth + u];
             g_pFramePixels[rowIdx + x] = col;
             g_pFramePixels[rowIdx + x + 1] = col;
@@ -488,71 +603,61 @@ void Effect3DWarpTunnel(float time, float dt) {
     }
 }
 
-// 20. GEOMETRIC IMPLOSION
+// 20. GEOMETRIC IMPLOSION (Direct Fast Lines)
 void EffectGeometricImplosion(float time, float dt) {
-    float ax = g_ScreenWidth * 0.5f + cosf(time * 2.5f) * (g_ScreenWidth * 0.3f);
-    float ay = g_ScreenHeight * 0.5f + sinf(time * 2.0f) * (g_ScreenHeight * 0.25f);
+    float ax = g_ScreenWidth * 0.5f + cosf(time * 2.2f) * (g_ScreenWidth * 0.3f);
+    float ay = g_ScreenHeight * 0.5f + sinf(time * 1.9f) * (g_ScreenHeight * 0.25f);
     float progress = fmodf(time * 2.0f, 1.0f);
+    int sides = 18;
 
-    HPEN pen = CreatePen(PS_SOLID, 2, RGB(255, 0, 130));
-    HGDIOBJ old = SelectObject(g_hMemDC, pen);
-    for (int i = 0; i < 20; ++i) {
-        float initAngle = i * (6.28318f / 20);
-        float initDist = 400.0f * (1.0f - progress);
+    for (int i = 0; i < sides; ++i) {
+        float initAngle = i * (6.28318f / sides) + time;
+        float initDist = 450.0f * (1.0f - progress);
         int px = static_cast<int>(ax + cosf(initAngle) * initDist);
         int py = static_cast<int>(ay + sinf(initAngle) * initDist);
-        POINT pts[3] = { { px, py }, { px + 20, py - 30 }, { px - 20, py - 30 } };
-        Polygon(g_hMemDC, pts, 3);
+        int p2x = static_cast<int>(ax + cosf(initAngle + 0.3f) * (initDist * 0.8f));
+        int p2y = static_cast<int>(ay + sinf(initAngle + 0.3f) * (initDist * 0.8f));
+        FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, px, py, p2x, p2y, 0x00FF007F);
     }
-    SelectObject(g_hMemDC, old);
-    DeleteObject(pen);
 }
 
 // 21. X-RAY SCANNER
 void EffectXRayScanner(float time, float dt) {
-    int scanX = static_cast<int>((sinf(time * 2.5f) + 1.0f) * 0.5f * (g_ScreenWidth - 200));
-    int scanW = 200;
+    int scanX = static_cast<int>((sinf(time * 2.8f) + 1.0f) * 0.5f * (g_ScreenWidth - 240));
+    int scanW = 240;
 
     for (int y = 0; y < g_ScreenHeight; ++y) {
         int rowIdx = y * g_ScreenWidth;
         for (int x = scanX; x < scanX + scanW; ++x) {
             uint32_t c = g_pScratchPixels[rowIdx + x];
-            uint32_t cRight = g_pScratchPixels[rowIdx + std::min(x + 1, g_ScreenWidth - 1)];
+            uint32_t cRight = g_pScratchPixels[rowIdx + (std::min)(x + 1, g_ScreenWidth - 1)];
             int edge = abs(static_cast<int>(c & 0xFF) - static_cast<int>(cRight & 0xFF));
-            g_pFramePixels[rowIdx + x] = (edge > 20) ? 0x0000FFFF : 0x00200040;
+            g_pFramePixels[rowIdx + x] = (edge > 18) ? 0x0000FFFF : 0x00250045;
         }
     }
 }
 
 // 22. SCREEN PEEL & FOLD
 void EffectScreenPeelAndFold(float time, float dt) {
-    float t = (sinf(time * 2.2f) + 1.0f) * 0.5f;
-    int peelX = static_cast<int>(g_ScreenWidth * 0.5f * t);
-    int peelY = static_cast<int>(g_ScreenHeight * 0.5f * t);
+    float t = (sinf(time * 2.4f) + 1.0f) * 0.5f;
+    int peelX = static_cast<int>(g_ScreenWidth * 0.55f * t);
+    int peelY = static_cast<int>(g_ScreenHeight * 0.55f * t);
 
-    POINT pts[3] = { { 0, 0 }, { peelX, 0 }, { 0, peelY } };
-    HRGN hRgn = CreatePolygonRgn(pts, 3, WINDING);
-    SelectClipRgn(g_hMemDC, hRgn);
-
-    HBRUSH b = CreateHatchBrush(HS_DIAGCROSS, RGB(0, 255, 180));
-    RECT r = { 0, 0, peelX, peelY };
-    FillRect(g_hMemDC, &r, b);
-    DeleteObject(b);
-
-    SelectClipRgn(g_hMemDC, NULL);
-    DeleteObject(hRgn);
+    for (int y = 0; y < peelY && y < g_ScreenHeight; ++y) {
+        int maxX = static_cast<int>(peelX * (1.0f - (static_cast<float>(y) / (peelY + 1))));
+        for (int x = 0; x < maxX && x < g_ScreenWidth; ++x) {
+            g_pFramePixels[y * g_ScreenWidth + x] = ((x ^ y) & 8) ? 0x0000FFAA : 0x00101010;
+        }
+    }
 }
 
 // 23. HOLOGRAPHIC GLITCH OBJECTS
 void EffectHolographicGlitch(float time, float dt) {
-    HPEN pen = CreatePen(PS_SOLID, 2, RGB(0, 255, 255));
-    HGDIOBJ old = SelectObject(g_hMemDC, pen);
-
     for (int k = 0; k < 4; ++k) {
-        float ox = g_ScreenWidth * (0.25f + 0.2f * k);
-        float oy = g_ScreenHeight * 0.5f + sinf(time * 2.0f + k) * 150.0f;
-        float size = 50.0f;
-        float ang = time * 3.0f + k;
+        float ox = g_ScreenWidth * (0.2f + 0.2f * k);
+        float oy = g_ScreenHeight * 0.5f + sinf(time * 2.2f + k * 1.5f) * 160.0f;
+        float size = 55.0f;
+        float ang = time * 3.2f + k;
 
         POINT box[8];
         for (int i = 0; i < 8; ++i) {
@@ -560,48 +665,48 @@ void EffectHolographicGlitch(float time, float dt) {
             float vy = (i & 2) ? size : -size;
             float vz = (i & 4) ? size : -size;
             float rx = vx * cosf(ang) - vz * sinf(ang);
-            float rz = vx * sinf(ang) + vz * cosf(ang) + 200.0f;
-            box[i].x = static_cast<LONG>(ox + (rx * 160.0f) / rz);
-            box[i].y = static_cast<LONG>(oy + (vy * 160.0f) / rz);
+            float rz = vx * sinf(ang) + vz * cosf(ang) + 220.0f;
+            box[i].x = static_cast<LONG>(ox + (rx * 180.0f) / rz);
+            box[i].y = static_cast<LONG>(oy + (vy * 180.0f) / rz);
         }
-        int edges[12][2] = { {0,1},{1,3},{3,2},{2,0},{4,5},{5,7},{7,6},{6,4},{0,4},{1,5},{2,6},{3,7} };
+        int edges[12][2] = {
+            {0,1},{1,3},{3,2},{2,0},
+            {4,5},{5,7},{7,6},{6,4},
+            {0,4},{1,5},{2,6},{3,7}
+        };
+        uint32_t col = (k % 2 == 0) ? 0x0000FFFF : 0x00FF00AA;
         for (auto& e : edges) {
-            MoveToEx(g_hMemDC, box[e[0]].x, box[e[0]].y, NULL);
-            LineTo(g_hMemDC, box[e[1]].x, box[e[1]].y);
+            FastDrawLine(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, box[e[0]].x, box[e[0]].y, box[e[1]].x, box[e[1]].y, col);
         }
     }
-    SelectObject(g_hMemDC, old);
-    DeleteObject(pen);
 }
 
 // 24. SYNESTHESIA STORM
 void EffectSynesthesiaStorm(float time, float dt) {
-    int bars = 24;
+    int bars = 32;
     int bw = g_ScreenWidth / bars;
     for (int i = 0; i < bars; ++i) {
-        float hNorm = (sinf(time * 7.0f + i * 0.5f) + 1.0f) * 0.5f;
-        int barH = static_cast<int>(hNorm * (g_ScreenHeight * 0.35f));
-        RECT r = { i * bw, g_ScreenHeight - barH, (i + 1) * bw - 2, g_ScreenHeight };
-        HBRUSH b = CreateSolidBrush(RGB((i * 15) % 255, 255 - (i * 9) % 255, 200));
-        FillRect(g_hMemDC, &r, b);
-        DeleteObject(b);
+        float hNorm = (sinf(time * 7.5f + i * 0.6f) + 1.0f) * 0.5f;
+        int barH = static_cast<int>(hNorm * (g_ScreenHeight * 0.4f));
+        uint32_t col = ((i * 8) << 16) | ((255 - i * 6) << 8) | 220;
+        FastFillRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, i * bw, g_ScreenHeight - barH, bw - 2, barH, col);
     }
 }
 
 // 25. REALITY COLLAPSE FINALE
 void EffectRealityCollapseFinale(float time, float dt) {
     float cycle = fmodf(time, 4.0f);
-    float scale = (std::max)(0.05f, 1.0f - (cycle / 4.0f));
+    float scale = (std::max)(0.03f, 1.0f - (cycle / 4.0f));
 
     int nw = static_cast<int>(g_ScreenWidth * scale);
     int nh = static_cast<int>(g_ScreenHeight * scale);
-    int ox = (g_ScreenWidth - nw) / 2 + RandInt(-10, 10);
+    int ox = (g_ScreenWidth - nw) / 2 + FastRandInt(-12, 12);
     int oy = (g_ScreenHeight - nh) / 2;
 
     SetStretchBltMode(g_hMemDC, COLORONCOLOR);
     StretchBlt(g_hMemDC, ox, oy, nw, nh, g_hScratchDC, 0, 0, g_ScreenWidth, g_ScreenHeight, SRCCOPY);
     if (cycle > 2.5f) {
-        PatBlt(g_hMemDC, ox, oy, nw, nh, DSTINVERT);
+        FastInvertRect(g_pFramePixels, g_ScreenWidth, g_ScreenHeight, ox, oy, nw, nh);
     }
 }
 
@@ -647,7 +752,7 @@ static const PayloadRecord g_Payloads[25] = {
 // WIN32 RUNTIME & STACKING SCHEDULER
 // ============================================================================
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (msg == WM_HOTKEY && wParam == 101) { // Emergency Exit
+    if (msg == WM_HOTKEY && wParam == 101) {
         g_Running = false;
         PostQuitMessage(0);
         return 0;
@@ -658,6 +763,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     g_ScreenWidth = GetSystemMetrics(SM_CXSCREEN);
     g_ScreenHeight = GetSystemMetrics(SM_CYSCREEN);
+    size_t totalBytes = static_cast<size_t>(g_ScreenWidth) * g_ScreenHeight * sizeof(uint32_t);
 
     const wchar_t CLASS_NAME[] = L"StackedChaosOverlay";
     WNDCLASSW wc = {};
@@ -677,27 +783,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     SetWindowDisplayAffinity(hWnd, WDA_EXCLUDEFROMCAPTURE);
     RegisterHotKey(hWnd, 101, MOD_CONTROL | MOD_SHIFT, 'Q');
 
-    // Framebuffer setup
+    // Fast Top-Down 32-bit Framebuffers
     HDC hScreenDC = GetDC(NULL);
     BITMAPINFO bmi = {};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biWidth = g_ScreenWidth;
-    bmi.bmiHeader.biHeight = -g_ScreenHeight; // Top-Down
+    bmi.bmiHeader.biHeight = -g_ScreenHeight;
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
-    // 1. Output Composite Buffer
     g_hMemDC = CreateCompatibleDC(hScreenDC);
     g_hDIB = CreateDIBSection(hScreenDC, &bmi, DIB_RGB_COLORS, reinterpret_cast<void**>(&g_pFramePixels), NULL, 0);
     SelectObject(g_hMemDC, g_hDIB);
 
-    // 2. Inter-Payload Scratch Buffer
     g_hScratchDC = CreateCompatibleDC(hScreenDC);
     g_hScratchBmp = CreateDIBSection(hScreenDC, &bmi, DIB_RGB_COLORS, reinterpret_cast<void**>(&g_pScratchPixels), NULL, 0);
     SelectObject(g_hScratchDC, g_hScratchBmp);
 
-    // 3. Raw Live Screen Capture Buffer
     g_hBaseDC = CreateCompatibleDC(hScreenDC);
     g_hBaseBmp = CreateDIBSection(hScreenDC, &bmi, DIB_RGB_COLORS, reinterpret_cast<void**>(&g_pBasePixels), NULL, 0);
     SelectObject(g_hBaseDC, g_hBaseBmp);
@@ -705,7 +808,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     ReleaseDC(NULL, hScreenDC);
     ShowWindow(hWnd, SW_SHOWNOACTIVATE);
 
-    // Allocate downsampled History Buffer for Effect 18
+    // Allocate downsampled History Buffer for Time Echoes
     int echoW = g_ScreenWidth / 2;
     int echoH = g_ScreenHeight / 2;
     g_EchoHistory.resize(MAX_ECHOES);
@@ -714,13 +817,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         f.pixels.resize(echoW * echoH, 0);
     }
 
-    // Prepare randomized sequence of 10 unique payloads
+    std::mt19937 randGen(std::random_device{}());
     std::vector<int> pool(25);
     std::iota(pool.begin(), pool.end(), 0);
-    std::shuffle(pool.begin(), pool.end(), g_Rng);
+    std::shuffle(pool.begin(), pool.end(), randGen);
 
     std::vector<int> activePayloads;
-    activePayloads.push_back(pool[0]); // Start with 1 random payload immediately
+    activePayloads.push_back(pool[0]);
     int payloadsAdded = 1;
 
     using clock = std::chrono::high_resolution_clock;
@@ -728,7 +831,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     auto lastFrame = clock::now();
 
     float intervalTimer = 0.0f;
-    const float STAGE_INTERVAL = 10.0f; // 10 seconds per stage
+    const float STAGE_INTERVAL = 10.0f;
 
     POINT ptZero = { 0, 0 };
     SIZE szWnd = { g_ScreenWidth, g_ScreenHeight };
@@ -753,9 +856,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         float totalTime = std::chrono::duration<float>(now - startTime).count();
         lastFrame = now;
 
-        // ====================================================================
-        // STAGE LIFECYCLE: 10s intervals -> add payload -> up to 10 -> stop
-        // ====================================================================
         intervalTimer += dt;
         if (intervalTimer >= STAGE_INTERVAL) {
             intervalTimer = 0.0f;
@@ -763,19 +863,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
                 activePayloads.push_back(pool[payloadsAdded]);
                 payloadsAdded++;
             } else {
-                // All 10 payloads have run together for 10 seconds.
-                // Stop everything and restore the screen to its original state.
                 g_Running = false;
                 break;
             }
         }
 
-        // 1. INGEST LIVE DESKTOP
+        // 1. INGEST LIVE SCREEN INTO BASE BUFFER
         HDC hLiveDC = GetDC(NULL);
         BitBlt(g_hBaseDC, 0, 0, g_ScreenWidth, g_ScreenHeight, hLiveDC, 0, 0, SRCCOPY);
         ReleaseDC(NULL, hLiveDC);
 
-        // Record history frame for time echoes
+        // Record history snapshot
         static float echoTick = 0.0f;
         echoTick += dt;
         if (echoTick >= 0.08f) {
@@ -791,26 +889,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
             g_EchoHead++;
         }
 
-        // Initialize the working buffer with the untouched live desktop
-        BitBlt(g_hMemDC, 0, 0, g_ScreenWidth, g_ScreenHeight, g_hBaseDC, 0, 0, SRCCOPY);
+        // Copy base into working buffer
+        memcpy(g_pFramePixels, g_pBasePixels, totalBytes);
 
-        // 2. CHAIN-EXECUTE ALL ACTIVE PAYLOADS IN SEQUENCE
-        // Each payload distorts the result of all previous payloads without wiping the canvas.
+        // 2. CHAIN-EXECUTE ACTIVE PAYLOADS
         for (int pIdx : activePayloads) {
-            // Snapshot current composite state into scratch buffer
-            BitBlt(g_hScratchDC, 0, 0, g_ScreenWidth, g_ScreenHeight, g_hMemDC, 0, 0, SRCCOPY);
-            // Execute payload (reads from g_hScratchDC, writes into g_hMemDC)
+            // Snapshot current composite for the payload
+            memcpy(g_pScratchPixels, g_pFramePixels, totalBytes);
             g_Payloads[pIdx].fn(totalTime, dt);
         }
 
-        // 3. FLUSH LAYERED WINDOW TO DWM
+        // 3. FLUSH COMPOSITED FRAME TO DWM
         UpdateLayeredWindow(hWnd, NULL, &ptZero, &szWnd, g_hMemDC, &ptZero, 0, &blend, ULW_ALPHA);
 
-        // ~60 FPS Frame Limiting
+        // Solid ~60 FPS Limiter
         Sleep(16);
     }
 
-    // Teardown: Immediate restoration of pristine desktop
+    // Teardown: Clean up and restore desktop
     UnregisterHotKey(hWnd, 101);
     DeleteObject(g_hDIB);
     DeleteDC(g_hMemDC);
@@ -820,7 +916,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     DeleteDC(g_hBaseDC);
     DestroyWindow(hWnd);
 
-    // Invalidate screen to force Windows to redraw underneath cleanly
     RedrawWindow(NULL, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 
     return 0;
