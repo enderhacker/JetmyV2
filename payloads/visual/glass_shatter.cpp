@@ -1,45 +1,85 @@
 #include "visual.h"
+#include <array>
 
 namespace VisualPayloads {
 void EffectDesktopGlassShatter(float time, float) {
-    // Triangular fragments rotate independently; unlike voxels these have no box faces.
+    struct Point { float x, y; };
+    struct Shard {
+        Point a, b, c, center;
+        float delay, speed, drift, spin;
+    };
     constexpr int cols = 7, rows = 5;
+    static std::array<Shard, cols * rows * 2> shards{};
+    static int lastCycle = -1, width = 0, height = 0;
+    int cycle = int(time / 6.0f);
     float phase = fmodf(time, 6.0f);
-    float fall = Smooth((phase - 0.6f) / 3.8f);
-    float settle = 1 - Smooth((phase - 5.0f) / 0.8f);
+    if (time == 0 || cycle != lastCycle || width != g_ScreenWidth || height != g_ScreenHeight) {
+        lastCycle = cycle; width = g_ScreenWidth; height = g_ScreenHeight;
+        std::array<Point, (cols + 1) * (rows + 1)> vertices{};
+        for (int row = 0; row <= rows; ++row) {
+            for (int col = 0; col <= cols; ++col) {
+                vertices[row * (cols + 1) + col] = {
+                    (col + (col > 0 && col < cols ? FastRandFloat(-0.38f, 0.38f) : 0)) * width / cols,
+                    (row + (row > 0 && row < rows ? FastRandFloat(-0.38f, 0.38f) : 0)) * height / rows};
+            }
+        }
+        Point impact{FastRandFloat(0, float(width)), FastRandFloat(0, float(height))};
+        size_t index = 0;
+        auto add = [&](Point a, Point b, Point c) {
+            Point center{(a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3};
+            float dx = (center.x - impact.x) / std::max(1, width);
+            float dy = (center.y - impact.y) / std::max(1, height);
+            shards[index++] = {a, b, c, center,
+                0.15f + sqrtf(dx * dx + dy * dy) * 0.65f + FastRandFloat(0, 0.4f),
+                FastRandFloat(0.6f, 1.3f), FastRandFloat(-0.22f, 0.22f), FastRandFloat(-1.8f, 1.8f)};
+        };
+        for (int row = 0; row < rows; ++row) {
+            for (int col = 0; col < cols; ++col) {
+                Point a = vertices[row * (cols + 1) + col], b = vertices[row * (cols + 1) + col + 1];
+                Point c = vertices[(row + 1) * (cols + 1) + col], d = vertices[(row + 1) * (cols + 1) + col + 1];
+                if (FastRandInt(0, 1)) { add(a, b, d); add(a, d, c); }
+                else { add(a, b, c); add(b, d, c); }
+            }
+        }
+    }
     int step = RasterStep();
-    for (int row = 0; row < rows; ++row) {
-        int y0 = row * g_ScreenHeight / rows, y1 = (row + 1) * g_ScreenHeight / rows;
-        for (int col = 0; col < cols; ++col) {
-            int x0 = col * g_ScreenWidth / cols, x1 = (col + 1) * g_ScreenWidth / cols;
-            if (x1 == x0 || y1 == y0) continue;
-            for (int half = 0; half < 2; ++half) {
-                int id = (row * cols + col) * 2 + half;
-                float angle = (id % 2 ? 1 : -1) * fall * (0.2f + (id % 5) * 0.09f) * settle;
-                float c = cosf(angle), s = sinf(angle);
-                float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
-                float shiftX = sinf(id * 12.3f) * g_ScreenWidth * 0.12f * fall * settle;
-                float shiftY = g_ScreenHeight * 0.7f * fall * fall * settle;
-                // Tight rotated bounds avoid scanning a large square for every shard.
-                float extentX = (fabsf(c) * (x1 - x0) + fabsf(s) * (y1 - y0)) * 0.5f;
-                float extentY = (fabsf(s) * (x1 - x0) + fabsf(c) * (y1 - y0)) * 0.5f;
-                float invW = 1.0f / (x1 - x0), invH = 1.0f / (y1 - y0);
-                for (int y = std::max(0, int(cy + shiftY - extentY) - 1); y < std::min(g_ScreenHeight, int(cy + shiftY + extentY) + 2); y += step) {
-                    for (int x = std::max(0, int(cx + shiftX - extentX) - 1); x < std::min(g_ScreenWidth, int(cx + shiftX + extentX) + 2); x += step) {
-                        float dx = x - cx - shiftX, dy = y - cy - shiftY;
-                        float sx = cx + dx * c + dy * s, sy = cy - dx * s + dy * c;
-                        if (sx < x0 || sx >= x1 || sy < y0 || sy >= y1) continue;
-                        float diagonal = (sx - x0) * invW - (sy - y0) * invH;
-                        if ((diagonal >= 0) != (half == 0)) continue;
-                        uint32_t color = Sample(int(sx), int(sy));
-                        float seam = std::min({sx - x0, x1 - sx, sy - y0, y1 - sy,
-                            fabsf(diagonal) * std::min(x1 - x0, y1 - y0)});
-                        color = BlendColor(color, 0xC5EBFF, seam < 2 ? 0.8f : 0.07f);
-                        Tile(x, y, step, color);
-                    }
-                }
+    // A brief reset restores the desktop before the next independently randomized break.
+    float settle = 1 - Smooth((phase - 5.0f) / 0.8f);
+    for (const auto& shard : shards) {
+        float age = std::max(0.0f, phase - shard.delay);
+        float angle = shard.spin * age * settle;
+        float c = cosf(angle), s = sinf(angle);
+        float shiftX = shard.drift * g_ScreenWidth * age * settle;
+        float shiftY = g_ScreenHeight * 0.20f * shard.speed * age * age * settle;
+        auto transform = [&](Point p) -> Point {
+            float dx = p.x - shard.center.x, dy = p.y - shard.center.y;
+            return {shard.center.x + shiftX + dx * c - dy * s,
+                shard.center.y + shiftY + dx * s + dy * c};
+        };
+        Point a = transform(shard.a), b = transform(shard.b), d = transform(shard.c);
+        int left = std::max(0, int(std::min({a.x, b.x, d.x})) - 1);
+        int right = std::min(g_ScreenWidth, int(std::max({a.x, b.x, d.x})) + 2);
+        int top = std::max(0, int(std::min({a.y, b.y, d.y})) - 1);
+        int bottom = std::min(g_ScreenHeight, int(std::max({a.y, b.y, d.y})) + 2);
+        float determinant = (shard.b.y - shard.c.y) * (shard.a.x - shard.c.x) +
+            (shard.c.x - shard.b.x) * (shard.a.y - shard.c.y);
+        if (fabsf(determinant) < 0.001f) continue;
+        float edgeA = std::hypot(shard.b.x - shard.c.x, shard.b.y - shard.c.y);
+        float edgeB = std::hypot(shard.c.x - shard.a.x, shard.c.y - shard.a.y);
+        float edgeC = std::hypot(shard.a.x - shard.b.x, shard.a.y - shard.b.y);
+        for (int y = top; y < bottom; y += step) {
+            for (int x = left; x < right; x += step) {
+                float dx = x - shard.center.x - shiftX, dy = y - shard.center.y - shiftY;
+                float sx = shard.center.x + dx * c + dy * s, sy = shard.center.y - dx * s + dy * c;
+                float u = ((shard.b.y - shard.c.y) * (sx - shard.c.x) + (shard.c.x - shard.b.x) * (sy - shard.c.y)) / determinant;
+                float v = ((shard.c.y - shard.a.y) * (sx - shard.c.x) + (shard.a.x - shard.c.x) * (sy - shard.c.y)) / determinant;
+                float w = 1 - u - v;
+                if (u < 0 || v < 0 || w < 0) continue;
+                float seam = fabsf(determinant) * std::min({u / std::max(0.001f, edgeA),
+                    v / std::max(0.001f, edgeB), w / std::max(0.001f, edgeC)});
+                Tile(x, y, step, BlendColor(Sample(int(sx), int(sy)), 0xC5EBFF, seam < 2 ? 0.8f : 0.07f));
             }
         }
     }
 }
-}
+} // namespace VisualPayloads

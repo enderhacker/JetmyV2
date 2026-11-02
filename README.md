@@ -70,7 +70,7 @@ change exits cleanly rather than continuing with stale framebuffer dimensions.
 | Pixel Fireworks | Rising rockets explode into gravity-driven sparks with fading tails. |
 | Chaos Rectangles | Grid-aligned architectural panels; one panel changes per tick. |
 | Black Hole Singularities | Local gravitational lens, dark event horizon, hot accretion rim. |
-| Desktop Glass Shatter | Independently rotating triangular image fragments. |
+| Desktop Glass Shatter | New irregular fractures each cycle, with randomized fall delays, drift, speed and spin. |
 | Living Digital Infection | Persistent, branching filaments with bright growing tips. |
 | Impossible Windows | Moving recursive desktop viewports with nested title bars. |
 | Liquid Desktop | Slow crossed wave fields with subtle water caustics. |
@@ -83,7 +83,7 @@ change exits cleanly rather than continuing with stale framebuffer dimensions.
 | Matrix Reconstruction | Independently moving green glyph streams with pale leading characters. |
 | RGB Spectral Phantoms | Independently displaced red, green, and blue image channels. |
 | Kaleidoscopic Reality | Six-sector mirrored image symmetry with slow source rotation. |
-| Gravity Paint | Glossy, winding liquid rivulets with rounded heavy droplets. |
+| Gravity Paint | Thin, winding paint trails that remain until the effect is disabled, with rounded leading droplets. |
 | Desktop Time Echoes | Four moving panes blend different capture-history delays. |
 | 3D Warp Tunnel | Perspective image-textured tunnel with radial ribs and traveling rings. |
 | Geometric Implosion | Flat nested nine-sided guilloche outlines converge inward. |
