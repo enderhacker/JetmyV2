@@ -1,6 +1,6 @@
 # Payloads
 
-All 49 payloads: 34 visual effects and 15 sounds. Use `JetmyV2.exe --menu`
+All 47 payloads: 32 visual effects and 15 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -39,9 +39,7 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Infinite Tunnel | Repeated shrinking desktop copies create an endless rectangular tunnel. |
 | XOR Color Chaos | Animated XOR patterns mix the desktop's colors into moving geometric interference. |
 | Screen Color Inversion | Inverts every desktop color while enabled, without changing display settings. |
-| Reversed Interface Text | Overlays reversed readable Win32 captions and a simulated search box; custom-drawn UI is not fully supported and real app text is unchanged. |
-| Popup Cascade | Temporary, simulated message boxes appear across the screen; no real dialogs open. |
-| Slight Mouse Movement | Nudges the idle pointer within three pixels of its last user position; pauses for movement, clicks and recent input. |
+| Popup Cascade | 24 simulated system messages with OS-aware XP, Vista/7, Windows 10 or Windows 11 styling, system fonts, DPI-scaled layouts and status icons; no real dialogs open. |
 
 ## Sound payloads
 

@@ -155,8 +155,6 @@ void EffectMeltingScreen(float, float);
 void EffectInfiniteTunnel(float, float);
 void EffectXorColorChaos(float, float);
 void EffectScreenColorInversion(float, float);
-void EffectReverseText(float, float);
 void EffectPopupCascade(float, float);
-void EffectMouseDrift(float, float);
 
 } // namespace VisualPayloads

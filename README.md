@@ -5,7 +5,7 @@ desktop look chaotic with screen distortions, animations and electronic sounds,
 without actually damaging your system. Effects are drawn in a temporary overlay,
 not applied to your files or desktop settings.
 
-Includes **34 visual effects** and **15 sounds**, including original bytebeat songs.
+Includes **32 visual effects** and **15 sounds**, including original bytebeat songs.
 See [payloads.md](payloads.md) for the full list and short descriptions.
 
 ## Run
@@ -18,9 +18,7 @@ See [payloads.md](payloads.md) for the full list and short descriptions.
 
 **Warning:** contains flashing visuals and electronic sounds. Avoid if you have
 photosensitivity, and only run it on a computer with its user's permission.
-The mouse-movement payload nudges an idle pointer by at most three pixels around
-its last position and yields to user input. Popups and reversed text are overlays,
-not real dialogs or changes to other apps.
+Popups are overlays, not real dialogs or changes to other apps.
 
 ## Build
 

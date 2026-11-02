@@ -41,9 +41,7 @@ const std::vector<PayloadRecord>& Registry() {
         { "Infinite Tunnel", EffectInfiniteTunnel },
         { "XOR Color Chaos", EffectXorColorChaos },
         { "Screen Color Inversion", EffectScreenColorInversion, false },
-        { "Reversed Interface Text", EffectReverseText, false },
-        { "Popup Cascade", EffectPopupCascade, false },
-        { "Slight Mouse Movement", EffectMouseDrift, false }
+        { "Popup Cascade", EffectPopupCascade, false }
     };
     return payloads;
 }
