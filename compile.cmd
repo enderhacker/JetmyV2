@@ -7,7 +7,7 @@ setlocal enabledelayedexpansion
 set "TARGET=JetmyV2.exe"
 set "SOURCE=main.cpp"
 set "SOURCES=%SOURCE%"
-for %%F in (payloads\visual\*.cpp payloads\sound\*.cpp) do set SOURCES=!SOURCES! "%%F"
+for %%F in (runtime\*.cpp payloads\visual\*.cpp payloads\sound\*.cpp) do set SOURCES=!SOURCES! "%%F"
 
 :: ========================================================
 :: 1. ENVIRONMENT & FILE CHECKS
@@ -47,6 +47,7 @@ echo [*] Compiling %SOURCE% -^> %TARGET%...
 :: Use -Os if you prioritize the smallest possible file size.
 g++ %SOURCES% -o "%TARGET%" ^
     -std=c++17 ^
+    -pthread ^
     -O3 ^
     -flto ^
     -s ^
@@ -59,6 +60,7 @@ g++ %SOURCES% -o "%TARGET%" ^
     -lgdi32 ^
     -luser32 ^
     -lwinmm ^
+    -lshell32 ^
     -mwindows
 
 if %ERRORLEVEL% neq 0 (

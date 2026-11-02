@@ -6,6 +6,7 @@ void EffectSynesthesiaStorm(float time, float dt) {
     // Radial pseudo-spectrum, deliberately not another rectangular equalizer.
     // This is procedural animation, not a claim of microphone/audio analysis.
     static std::array<float, 64> levels{}, peaks{};
+    if (time == 0) { levels.fill(0); peaks.fill(0); }
     float cx = g_ScreenWidth * 0.5f, cy = g_ScreenHeight * 0.5f;
     float unit = float(std::min(g_ScreenWidth, g_ScreenHeight));
     float baseRadius = unit * 0.19f;

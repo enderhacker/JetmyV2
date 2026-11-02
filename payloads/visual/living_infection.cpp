@@ -9,6 +9,7 @@ void EffectLivingInfection(float time, float dt) {
     static std::array<Segment, 1400> segments{};
     static size_t head = 0, count = 0;
     static float tick = 1;
+    if (time == 0) { tips.clear(); head = count = 0; tick = 1; }
     constexpr uint32_t colors[] = {0x75FFA1, 0xA8E873, 0x42DCD0};
     if (tips.capacity() < 72) tips.reserve(72);
     tick += dt;

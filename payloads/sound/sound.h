@@ -9,8 +9,12 @@
 #include <windows.h>
 #include <mmsystem.h>
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <random>
+#include <thread>
 #include <vector>
 
 namespace SoundPayloads {
@@ -49,9 +53,9 @@ float SonarSoundscape(uint32_t, Voice&);
 float GlassBells(uint32_t, Voice&);
 float RainOnMetal(uint32_t, Voice&);
 float CosmicDrone(uint32_t, Voice&);
-std::vector<int16_t> Synthesize(Generator generator, unsigned seconds, std::mt19937& random);
+std::vector<int16_t> Synthesize(Generator generator, unsigned seconds, std::mt19937& random, bool loop = false);
 
-// One device and one owned buffer: replacing a sound always resets the old one.
+// A single continuously queued output stream; selection changes crossfade inside it.
 class Player {
 public:
     Player() = default;
@@ -59,12 +63,27 @@ public:
     Player(const Player&) = delete;
     Player& operator=(const Player&) = delete;
     bool PlayRandom(unsigned seconds, std::mt19937& random);
+    bool Play(size_t index, unsigned seconds, std::mt19937& random);
+    bool IsPlaying() const { return healthy_.load(); }
+    int ActiveIndex() const { return IsPlaying() ? active_ : -1; }
     void Stop();
 private:
+    static constexpr size_t BlockSamples = 256;
+    struct Block {
+        WAVEHDR header{};
+        std::array<int16_t, BlockSamples> samples{};
+        bool prepared = false, queued = false;
+    };
+    bool Open();
+    void Stream();
     HWAVEOUT device_ = nullptr;
-    WAVEHDR header_ = {};
-    bool prepared_ = false;
-    std::vector<int16_t> samples_;
+    HANDLE completed_ = nullptr, wake_ = nullptr;
+    std::array<Block, 3> blocks_{};
+    std::thread worker_;
+    std::atomic<bool> stopping_{false}, healthy_{false};
+    std::mutex mutex_;
+    std::shared_ptr<const std::vector<int16_t>> requested_;
+    int active_ = -1;
     size_t previous_ = static_cast<size_t>(-1);
 };
 } // namespace SoundPayloads

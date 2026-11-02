@@ -2,12 +2,13 @@
 #include <array>
 
 namespace VisualPayloads {
-void EffectPixelSortingAnomaly(float, float dt) {
+void EffectPixelSortingAnomaly(float time, float dt) {
     struct Band { int x, y, w, h, channel; bool reverse; };
     static std::array<Band, 9> bands{};
     static float tick = 1;
     static bool initialized = false;
     static size_t next = 0;
+    if (time == 0) { initialized = false; tick = 1; next = 0; }
     auto create = [](Band& b) {
         b.w = std::min(g_ScreenWidth, FastRandInt(90, 360));
         b.h = std::min(g_ScreenHeight, FastRandInt(5, 18));

@@ -6,6 +6,7 @@ void EffectImpossibleWindows(float time, float dt) {
     struct Window { float x, y, vx, vy; };
     static std::array<Window, 4> windows{};
     static bool initialized = false;
+    if (time == 0) initialized = false;
     int w = std::min(310, g_ScreenWidth), h = std::min(184, g_ScreenHeight);
     if (!initialized) {
         for (auto& win : windows) win = {FastRandFloat(0, float(g_ScreenWidth - w)),

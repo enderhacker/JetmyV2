@@ -119,6 +119,7 @@ inline void Tile(int x, int y, int step, uint32_t color) {
     else Fill(x, y, step, step, color);
 }
 
+// A first call with time == 0 resets animation state for independent menu previews.
 using PayloadFn = void (*)(float time, float dt);
 struct PayloadRecord { const char* name; PayloadFn fn; bool needsSnapshot = true; };
 const std::vector<PayloadRecord>& Registry();

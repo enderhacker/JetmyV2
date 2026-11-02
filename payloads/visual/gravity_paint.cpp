@@ -2,10 +2,11 @@
 #include <array>
 
 namespace VisualPayloads {
-void EffectGravityPaint(float, float dt) {
+void EffectGravityPaint(float time, float dt) {
     struct Drip { float x, head, speed, phase; int width; uint32_t color; };
     static std::array<Drip, 24> drips{};
     static bool initialized = false;
+    if (time == 0) initialized = false;
     constexpr uint32_t colors[] = {0xFF638B, 0xF8C663, 0x6EDAC4, 0x9B8AFB};
     auto reset = [&colors](Drip& d, bool initial) {
         d.x = FastRandFloat(0, float(g_ScreenWidth - 1));

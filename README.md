@@ -5,30 +5,56 @@ Effects only draw into the overlay; they do not modify the desktop itself.
 
 ## Sequence
 
-- 0–10 seconds: one random visual, no sound.
-- 10–20 seconds: add a second visual and play a random sound.
-- 20–30 seconds: add a third visual and stop sound.
-- Continue alternating silent/sound stages every 10 seconds.
-- 90–100 seconds: ten stacked visuals and one sound.
+- At startup: one random visual and a random looping sound.
+- Every 10 seconds: add another visual, keeping previous visuals active.
+- At visuals #3, #5, #7 and #9 (20, 40, 60 and 80 seconds): switch to a
+  different random sound. Even-numbered visuals leave the sound playing.
+- 90–100 seconds: ten stacked visuals; audio continues looping.
 - At 100 seconds: stop audio, destroy the overlay, refresh the desktop, and quit.
 
 Visuals are selected without repeats. Existing visuals remain active as new ones
-are added. Audio never stacks: one owned WinMM playback buffer is stopped before
-replacement or a silent stage. Audio uses bounded amplitude and short fades, and
-does not change system volume. If no audio device is available, visuals continue.
+are added. A dedicated worker continuously queues one WinMM output stream.
+Sounds loop with smoothed seams, and replacements crossfade for 50 ms without
+closing the device or inserting a silent stage. A new clip is synthesized while
+the old one keeps playing. Output is bounded and system volume is never changed.
+If no audio device is available, visuals continue.
 
 **Exit early:** Ctrl+Shift+Q or Ctrl+Shift+Esc.
 Warning: flashing visuals and electronic sounds; avoid use with photosensitivity.
 
+## Manual controls
+
+```powershell
+.\JetmyV2.exe --menu
+```
+
+This opens a native, resizable control panel instead of starting the show.
+Everything starts **off**, and there is no 100-second timeout.
+
+- Toggle any visual on or off; enable just one to inspect it independently, or
+  combine several. Re-enabling a visual restarts its animation state.
+- Toggle a sound on to loop it indefinitely. Selecting another sound replaces it
+  with a short crossfade; clicking the selected sound again turns audio off.
+- Audio works with all visuals off; visuals work with audio off.
+- **Stop all** clears every toggle, stops audio, and removes the overlay.
+- Both lists scroll independently; Tab/Shift+Tab and Space work on the buttons.
+- The control panel is protected from visual effects and stays usable while
+  previews run. Close it, or use an emergency shortcut, to stop everything.
+
+No screen capture or rendering runs while all visual toggles are off.
+Use `--help` for command-line usage; unknown arguments do not start the show.
+
 ## Layout and build
 
-- `main.cpp`: overlay, resource cleanup, capture/compositing loop.
+- `main.cpp`: exact command-line argument parsing and application entry point.
+- `runtime/app.cpp`: overlay, resource cleanup, capture/compositing loop and mode coordination.
+- `runtime/menu.cpp`: native control panel and scrollable toggle lists.
 - `runtime/schedule.h`: ten-stage timing and sound policy.
 - `payloads/visual/`: `VisualPayloads`, shared raster helpers, registry, one effect per `.cpp`.
 - `payloads/sound/`: `SoundPayloads`, bytebeat/random generators, registry, single-player audio.
 
 Run `compile.cmd` from this directory with MinGW-w64 `g++` on PATH.
-It compiles all modules and links GDI, User32, and WinMM into `JetmyV2.exe`.
+It compiles all modules and links GDI, User32, WinMM, and Shell32 into `JetmyV2.exe`.
 The existing build script stops a running `JetmyV2.exe` before replacing it.
 
 ## Payload identities
@@ -69,7 +95,8 @@ change exits cleanly rather than continuing with stale framebuffer dimensions.
 
 The spectrum is procedural, not microphone input or audio analysis. Sounds have
 independent per-clip state, DC removal, mild low-pass filtering, bounded output,
-and 30 ms clip-edge fades. Consecutive sound stages never select the same sound.
+30 ms loop-seam smoothing and short transition fades. Automatic sound changes
+never select the same sound as the previous selection.
 
 | Sound | Distinct behavior |
 | --- | --- |
@@ -92,5 +119,5 @@ and 30 ms clip-edge fades. Consecutive sound stages never select the same sound.
 The six new songs are original bytebeat/chiptune-style compositions, not recordings
 or recreations of existing songs. Integer phase counters generate quantized voices;
 explicit note sequences, rests, envelopes and percussion provide musical structure.
-Each arrangement fits a ten-second sound stage, including a six-bar 3/4 waltz.
+Each arrangement fits a ten-second loop, including a six-bar 3/4 waltz.
 All 15 sounds share the same single-player replacement and output-limiting path.

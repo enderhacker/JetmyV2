@@ -4,6 +4,7 @@ namespace VisualPayloads {
 void EffectMatrixReconstruction(float time, float dt) {
     struct Stream { float head, speed; int length; uint32_t seed; };
     static std::vector<Stream> streams;
+    if (time == 0) streams.clear();
     int cell = std::max(10, std::min(20, g_ScreenWidth / 35));
     size_t columns = static_cast<size_t>((g_ScreenWidth + cell - 1) / cell);
     if (streams.size() != columns) {

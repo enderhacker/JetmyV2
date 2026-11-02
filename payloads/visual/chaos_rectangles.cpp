@@ -2,12 +2,13 @@
 #include <array>
 
 namespace VisualPayloads {
-void EffectChaosRectangles(float, float dt) {
+void EffectChaosRectangles(float time, float dt) {
     struct Panel { int x, y, w, h; uint32_t color; bool solid; };
     static std::array<Panel, 14> panels{};
     static float tick = 1;
     static size_t next = 0;
     static bool initialized = false;
+    if (time == 0) { initialized = false; tick = 1; next = 0; }
     constexpr uint32_t palette[] = {0xFF583D, 0xFFD84A, 0x3C75FF, 0xF2F0E5, 0x101827};
     auto create = [](Panel& p) {
         int cell = std::max(8, std::min(g_ScreenWidth, g_ScreenHeight) / 20);

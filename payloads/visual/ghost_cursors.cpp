@@ -7,6 +7,7 @@ void EffectGhostCursorSwarm(float time, float dt) {
     static size_t head = 0;
     static float tick = 1;
     static bool initialized = false;
+    if (time == 0) { initialized = false; tick = 1; head = 0; }
     static HCURSOR cursor = LoadCursor(nullptr, IDC_ARROW); // Shared system handle; do not destroy.
     POINT mouse{};
     if (!GetCursorPos(&mouse) || !cursor) return;

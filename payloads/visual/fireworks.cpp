@@ -5,10 +5,11 @@ namespace {
 struct Spark { float x, y, vx, vy, age, life; uint32_t color; };
 struct Rocket { float x, y, targetY; uint32_t color; };
 }
-void EffectPixelFireworks(float, float dt) {
+void EffectPixelFireworks(float time, float dt) {
     static std::vector<Spark> sparks;
     static std::vector<Rocket> rockets;
     static float spawn = 1;
+    if (time == 0) { sparks.clear(); rockets.clear(); spawn = 1; }
     if (sparks.capacity() < 320) { sparks.reserve(320); rockets.reserve(4); }
     constexpr uint32_t colors[] = {0xFFB454, 0x65E6FF, 0xFF72AB, 0xBAFF86, 0xCE9CFF};
     spawn += dt;
