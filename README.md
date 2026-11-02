@@ -7,6 +7,7 @@ not applied to your files or desktop settings.
 
 Includes **32 visual effects** and **15 sounds**, including original bytebeat songs.
 The show ends with a **10-second simulated blue-screen finale**.
+The finale plays one continuous error tone at a bounded volume.
 See [payloads.md](payloads.md) for the full list and short descriptions.
 
 ## Run
