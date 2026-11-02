@@ -1,6 +1,6 @@
 # Payloads
 
-All 48 payloads: 32 visual effects, one finale and 15 sounds. Use `JetmyV2.exe --menu`
+All 51 payloads: 35 visual effects, one finale and 15 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -27,6 +27,9 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Gravity Paint | Thin paint drips leave winding trails that remain while the effect is enabled. |
 | Desktop Time Echoes | Moving panes blend delayed snapshots of the desktop. |
 | 3D Warp Tunnel | Maps the desktop onto a perspective tunnel with rings and radial ribs. |
+| Infinite Desktop City | Flies down a night-time avenue between desktop-textured skyscrapers, with luminous window grids, street reflections and distance fog. |
+| Desktop Planet | Wraps the desktop around a rotating globe with atmospheric glow and a tilted, textured ring that passes in front and behind. |
+| Mobius Reality Ribbon | Folds the desktop into a rotating, half-twisted 3D ribbon with scrolling textures, contrasting faces and luminous edges. |
 | Geometric Implosion | Nested polygon patterns converge inward. |
 | X-Ray Scanner | A moving inspection pane reveals image edges and inverted colors. |
 | Screen Peel & Fold | Peels a diagonal screen corner back with a curled underside and shadow. |

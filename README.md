@@ -5,7 +5,7 @@ appearance of a chaotic desktop with screen distortions, animations, simulated
 system messages, and synthesized audio. It is a visual demo, not a tool that
 infects or damages your computer.
 
-The project includes **32 visual effects**, **15 sound payloads**, and a separate
+The project includes **35 visual effects**, **15 sound payloads**, and a separate
 **10-second simulated blue-screen finale**. You can run an automatic show or use
 the manual control panel to preview effects independently.
 
@@ -148,8 +148,8 @@ number of active visuals, selected sound, and audio-device errors when applicabl
 
 ## Visual and sound payloads
 
-See **[payloads.md](payloads.md)** for the complete list of all **48 payloads**
-and a short description of each: 32 normal visuals, 15 sounds, and one finale.
+See **[payloads.md](payloads.md)** for the complete list of all **51 payloads**
+and a short description of each: 35 normal visuals, 15 sounds, and one finale.
 
 Visuals include desktop warping, rotation, recursive tunnels, glass shattering,
 melting, persistent paint trails, particles, fractals, status icons, and simulated
