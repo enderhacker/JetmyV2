@@ -149,9 +149,20 @@ Launch with `--menu` to open a native Windows control panel. All payloads start
   previous previews do not resume.
 - **Close:** stops playback and closes the simulator.
 
-The visual and audio lists scroll independently. Use Tab/Shift+Tab to navigate
-controls and Space to toggle a focused payload button. The status area shows the
-number of active visuals, selected sound, and audio-device errors when applicable.
+Both payload lists are sorted alphabetically. Search filters visuals and audio
+by name without stopping or changing any selections; the headings show matching
+and total counts. Press **Ctrl+F** to focus search, or **Escape** to clear it.
+The **Clear** button also restores the full lists.
+
+Resize the panel freely: wide windows show both independently scrolling lists;
+narrow windows switch to **Visuals** and **Audio** tabs. Use Tab/Shift+Tab to
+navigate and Space to toggle a focused checkbox. Keyboard focus automatically
+scrolls the selected row into view. Sorting only changes the menu order, not
+visual stacking or playback behavior.
+
+The status area shows the total number of active visuals (including filtered-out
+ones), selected sound, and audio-device errors. **Stop all** stops everything
+regardless of the current filter or tab, and is disabled when nothing is active.
 
 ## Visual and sound payloads
 

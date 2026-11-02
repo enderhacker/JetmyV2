@@ -179,7 +179,7 @@ int Run(HINSTANCE instance, bool menuMode) {
         MSG msg = {};
         while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
             if (msg.message == WM_QUIT) running = false;
-            if (menuMode && IsDialogMessageW(menu.Window(), &msg)) continue;
+            if (menuMode && (menu.HandleMessage(msg) || IsDialogMessageW(menu.Window(), &msg))) continue;
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }

@@ -1,5 +1,8 @@
 #include "menu.h"
 #include "../payloads/sound/sound.h"
+#include <commctrl.h>
+#include <cwctype>
+#include <numeric>
 #include <stdexcept>
 
 namespace Runtime {
@@ -7,13 +10,20 @@ namespace {
 constexpr wchar_t MenuClass[] = L"JetmyPayloadControlPanel";
 constexpr wchar_t PaneClass[] = L"JetmyPayloadControlPane";
 constexpr int VisualBase = 1000, AudioBase = 2000, StopAll = 10, Close = 11, Finale = 12, FinaleStyle = 13;
+constexpr int Search = 14, ClearSearch = 15, VisualTab = 16, AudioTab = 17;
 std::wstring Wide(const char* text) { return std::wstring(text, text + strlen(text)); } // Registry names are ASCII.
+std::wstring Lower(std::wstring text) {
+    for (auto& ch : text) ch = static_cast<wchar_t>(std::towlower(ch));
+    return text;
+}
+void Text(HWND window, const wchar_t* text) { SetWindowTextW(window, text); }
+void Text(HWND window, const std::wstring& text) { Text(window, text.c_str()); }
 }
 
 ControlPanel::~ControlPanel() {
     if (window_) DestroyWindow(window_);
-    if (font_) DeleteObject(font_);
-    if (titleFont_) DeleteObject(titleFont_);
+    for (auto font : {font_, titleFont_, sectionFont_, smallFont_}) if (font) DeleteObject(font);
+    for (auto brush : {groundBrush_, surfaceBrush_, selectedBrush_}) if (brush) DeleteObject(brush);
     if (registered_) UnregisterClassW(MenuClass, instance_);
     if (paneRegistered_) UnregisterClassW(PaneClass, instance_);
 }
@@ -23,123 +33,255 @@ HWND ControlPanel::Add(HWND parent, const wchar_t* kind, const std::wstring& tex
         0, 0, 1, 1, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
     if (!child) throw std::runtime_error("Cannot create menu control.");
     SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(font_), FALSE);
+    if (wcscmp(kind, L"BUTTON") == 0 && (style & BS_TYPEMASK) == BS_OWNERDRAW) {
+        SetWindowLongPtrW(child, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+        auto original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(child, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ActionProc)));
+        if (!buttonProc_) buttonProc_ = original;
+    }
     return child;
 }
 
 void ControlPanel::Create() {
     HDC screen = GetDC(nullptr);
     if (screen) { dpi_ = GetDeviceCaps(screen, LOGPIXELSY); ReleaseDC(nullptr, screen); }
-    font_ = CreateFontW(-Scale(14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-    titleFont_ = CreateFontW(-Scale(23), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-    if (!font_ || !titleFont_) throw std::runtime_error("Cannot create menu fonts.");
+    HIGHCONTRASTW contrast{sizeof(HIGHCONTRASTW), 0, nullptr};
+    highContrast_ = SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0) && (contrast.dwFlags & HCF_HIGHCONTRASTON);
+    if (highContrast_) {
+        ground_ = GetSysColor(COLOR_BTNFACE); surface_ = GetSysColor(COLOR_WINDOW);
+        ink_ = GetSysColor(COLOR_WINDOWTEXT); muted_ = ink_; selected_ = GetSysColor(COLOR_HIGHLIGHT);
+    }
+    groundBrush_ = CreateSolidBrush(ground_); surfaceBrush_ = CreateSolidBrush(surface_);
+    selectedBrush_ = CreateSolidBrush(selected_);
+    auto font = [&](int size, int weight) {
+        return CreateFontW(-Scale(size), 0, 0, 0, weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+    };
+    font_ = font(14, FW_NORMAL); titleFont_ = font(24, FW_SEMIBOLD);
+    sectionFont_ = font(16, FW_SEMIBOLD); smallFont_ = font(13, FW_NORMAL);
+    if (!font_ || !titleFont_ || !sectionFont_ || !smallFont_ || !groundBrush_ || !surfaceBrush_ || !selectedBrush_)
+        throw std::runtime_error("Cannot create menu styling resources.");
     WNDCLASSW wc{};
-    wc.hInstance = instance_;
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+    wc.hInstance = instance_; wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.lpfnWndProc = WindowProc; wc.lpszClassName = MenuClass;
     if (!RegisterClassW(&wc)) throw std::runtime_error("Cannot register menu window.");
     registered_ = true;
     wc.lpfnWndProc = PaneProc; wc.lpszClassName = PaneClass;
-    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     if (!RegisterClassW(&wc)) throw std::runtime_error("Cannot register menu lists.");
     paneRegistered_ = true;
     RECT work{}; SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
-    int width = std::min(Scale(940), int(work.right - work.left));
-    int height = std::min(Scale(760), int(work.bottom - work.top));
+    int width = std::min(Scale(980), int(work.right - work.left));
+    int height = std::min(Scale(820), int(work.bottom - work.top));
     window_ = CreateWindowExW(WS_EX_TOPMOST | WS_EX_CONTROLPARENT, MenuClass, L"JetmyV2 - Payload controls",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, work.left + (work.right - work.left - width) / 2,
         work.top + (work.bottom - work.top - height) / 2, width, height,
         nullptr, nullptr, instance_, this);
     if (!window_) throw std::runtime_error("Cannot create payload menu.");
-    title_ = Add(window_, L"STATIC", L"Payload controls", SS_LEFT);
+    title_ = Add(window_, L"STATIC", L"JetmyV2 controls", SS_LEFT);
     SendMessageW(title_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont_), FALSE);
-    description_ = Add(window_, L"STATIC", L"Manual mode. Visuals combine freely; audio selections replace one another. Everything starts off.", SS_LEFT);
-    visualsTitle_ = Add(window_, L"STATIC", L"Visual payloads (" + std::to_wstring(controls_.visuals.size()) + L")", SS_LEFT);
-    audioTitle_ = Add(window_, L"STATIC", L"Looping audio (" + std::to_wstring(SoundPayloads::Registry().size()) + L")", SS_LEFT);
-    stop_ = Add(window_, L"BUTTON", L"Stop all", BS_PUSHBUTTON | WS_TABSTOP, StopAll);
-    close_ = Add(window_, L"BUTTON", L"Close", BS_PUSHBUTTON | WS_TABSTOP, Close);
-    finale_ = Add(window_, L"BUTTON", L"Blue screen (10s)", BS_PUSHBUTTON | WS_TABSTOP, Finale);
+    description_ = Add(window_, L"STATIC", L"Combine visuals. Choose one audio loop. Click again to turn off.", SS_LEFT);
+    stop_ = Add(window_, L"BUTTON", L"Stop all", BS_OWNERDRAW | WS_TABSTOP, StopAll);
+    searchLabel_ = Add(window_, L"STATIC", L"Search visuals and audio (Ctrl+F)", SS_LEFT);
+    search_ = Add(window_, L"EDIT", std::wstring{}, ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP, Search);
+    SendMessageW(search_, EM_SETLIMITTEXT, 128, 0);
+    SendMessageW(search_, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Search by name (Ctrl+F)"));
+    clear_ = Add(window_, L"BUTTON", L"Clear", BS_OWNERDRAW | WS_TABSTOP, ClearSearch);
+    visualsTitle_ = Add(window_, L"STATIC", L"Visual effects", SS_LEFT);
+    audioTitle_ = Add(window_, L"STATIC", L"Audio loops", SS_LEFT);
+    for (auto heading : {visualsTitle_, audioTitle_})
+        SendMessageW(heading, WM_SETFONT, reinterpret_cast<WPARAM>(sectionFont_), FALSE);
+    visualTab_ = Add(window_, L"BUTTON", L"Visual effects", BS_OWNERDRAW | WS_TABSTOP, VisualTab);
+    audioTab_ = Add(window_, L"BUTTON", L"Audio loops", BS_OWNERDRAW | WS_TABSTOP, AudioTab);
+    visualsHelp_ = Add(window_, L"STATIC", L"A-Z  /  Enable any combination", SS_LEFT);
+    audioHelp_ = Add(window_, L"STATIC", L"A-Z  /  One loop at a time", SS_LEFT);
+    close_ = Add(window_, L"BUTTON", L"Close", BS_OWNERDRAW | WS_TABSTOP, Close);
+    finale_ = Add(window_, L"BUTTON", L"Blue screen (10s)", BS_OWNERDRAW | WS_TABSTOP, Finale);
     finaleLabel_ = Add(window_, L"STATIC", L"Blue-screen style", SS_LEFT);
     finaleStyle_ = Add(window_, L"COMBOBOX", std::wstring{}, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP, FinaleStyle);
     for (const auto* style : {L"Automatic (this PC)", L"Windows XP", L"Windows Vista", L"Windows 7", L"Windows 10", L"Windows 11 (blue)"})
         SendMessageW(finaleStyle_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(style));
     SendMessageW(finaleStyle_, CB_SETCURSEL, 0, 0);
+    SendMessageW(finaleStyle_, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), Scale(24));
     status_ = Add(window_, L"STATIC", std::wstring{}, SS_LEFT);
-    hint_ = Add(window_, L"STATIC", L"Flashing visuals / electronic audio. Emergency exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.", SS_LEFT);
-    for (auto* pane : {&visuals_, &audio_}) {
-        pane->row = Scale(38);
-        pane->window = CreateWindowExW(WS_EX_CONTROLPARENT, PaneClass, L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
-            0, 0, 1, 1, window_, nullptr, instance_, pane);
-        if (!pane->window) throw std::runtime_error("Cannot create scrollable payload list.");
-    }
-    DWORD toggle = BS_AUTOCHECKBOX | BS_PUSHLIKE | BS_NOTIFY | WS_TABSTOP;
-    for (size_t i = 0; i < controls_.visuals.size(); ++i)
-        visuals_.buttons.push_back(Add(visuals_.window, L"BUTTON", Wide(VisualPayloads::Registry()[i].name), toggle, VisualBase + int(i)));
-    for (size_t i = 0; i < SoundPayloads::Registry().size(); ++i)
-        audio_.buttons.push_back(Add(audio_.window, L"BUTTON", Wide(SoundPayloads::Registry()[i].name), toggle, AudioBase + int(i)));
-    Layout(); Refresh();
+    hint_ = Add(window_, L"STATIC", L"Flashing visuals / audio. Exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.", SS_LEFT);
+    for (auto label : {searchLabel_, visualsHelp_, audioHelp_, finaleLabel_, hint_})
+        SendMessageW(label, WM_SETFONT, reinterpret_cast<WPARAM>(smallFont_), FALSE);
+    auto createPane = [&](Pane& pane, const wchar_t* name, int base) {
+        pane.owner = this; pane.row = Scale(44); pane.inset = Scale(8);
+        pane.window = CreateWindowExW(WS_EX_CONTROLPARENT, PaneClass, name,
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
+            0, 0, 1, 1, window_, nullptr, instance_, &pane);
+        if (!pane.window) throw std::runtime_error("Cannot create scrollable payload list.");
+        pane.empty = Add(pane.window, L"STATIC", L"No matches. Try another name or clear the search.", SS_LEFT);
+        pane.order.resize(pane.names.size()); std::iota(pane.order.begin(), pane.order.end(), size_t(0));
+        std::stable_sort(pane.order.begin(), pane.order.end(), [&](size_t a, size_t b) { return Lower(pane.names[a]) < Lower(pane.names[b]); });
+        pane.buttons.resize(pane.names.size());
+        // Create in display order for alphabetical Tab navigation, but retain
+        // registry-indexed storage and command IDs for all playback state.
+        for (size_t index : pane.order)
+            pane.buttons[index] = Add(pane.window, L"BUTTON", pane.names[index],
+                BS_AUTOCHECKBOX | BS_NOTIFY | BS_LEFT | BS_VCENTER | BS_MULTILINE | WS_TABSTOP, base + int(index));
+    };
+    for (const auto& visual : VisualPayloads::Registry()) visuals_.names.push_back(Wide(visual.name));
+    for (const auto& audio : SoundPayloads::Registry()) audio_.names.push_back(Wide(audio.name));
+    createPane(visuals_, L"Visual effects", VisualBase); createPane(audio_, L"Audio loops", AudioBase);
+    for (auto child : {search_, clear_, visualTab_, audioTab_, visuals_.window, audio_.window,
+            finaleStyle_, finale_, stop_, close_})
+        SetWindowPos(child, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    Filter(); Refresh(); Layout();
     ShowWindow(window_, SW_SHOW); UpdateWindow(window_);
-    SetFocus(visuals_.buttons.empty() ? stop_ : visuals_.buttons.front());
+    SetFocus(search_);
+}
+
+void ControlPanel::Pane::Filter(const std::wstring& query) {
+    visible.clear(); offset = 0;
+    for (size_t index : order) {
+        bool match = query.empty() || Lower(names[index]).find(query) != std::wstring::npos;
+        ShowWindow(buttons[index], match ? SW_SHOW : SW_HIDE);
+        if (match) visible.push_back(index);
+    }
+    ShowWindow(empty, visible.empty() ? SW_SHOW : SW_HIDE);
+    Reflow();
 }
 
 void ControlPanel::Pane::Reflow() {
+    if (!empty) return; // WM_SIZE can arrive while the pane is being created.
     RECT rect{}; GetClientRect(window, &rect);
-    int total = int(buttons.size()) * row + 12;
+    int total = int(visible.size()) * row + inset * 2;
     offset = std::clamp(offset, 0, std::max(0, total - int(rect.bottom)));
-    SCROLLINFO scroll{sizeof(SCROLLINFO), SIF_RANGE | SIF_PAGE | SIF_POS | SIF_DISABLENOSCROLL,
-        0, total - 1, static_cast<UINT>(rect.bottom), offset, 0};
+    SCROLLINFO scroll{sizeof(SCROLLINFO), SIF_RANGE | SIF_PAGE | SIF_POS,
+        0, std::max(0, total - 1), static_cast<UINT>(rect.bottom), offset, 0};
     SetScrollInfo(window, SB_VERT, &scroll, TRUE);
     GetClientRect(window, &rect);
-    for (size_t i = 0; i < buttons.size(); ++i)
-        MoveWindow(buttons[i], 6, 6 + int(i) * row - offset, std::max(1, int(rect.right) - 12), row - 4, TRUE);
+    HDWP positions = BeginDeferWindowPos(int(visible.size()) + 1);
+    auto move = [&](HWND child, int x, int y, int width, int height) {
+        if (positions) positions = DeferWindowPos(positions, child, nullptr, x, y, std::max(1, width), height, SWP_NOZORDER | SWP_NOACTIVATE);
+        else MoveWindow(child, x, y, std::max(1, width), height, TRUE);
+    };
+    for (size_t display = 0; display < visible.size(); ++display)
+        move(buttons[visible[display]], inset, inset + int(display) * row - offset,
+            rect.right - inset * 2, row - owner->Scale(4));
+    move(empty, inset * 2, inset * 2, rect.right - inset * 4, owner->Scale(64));
+    if (positions) EndDeferWindowPos(positions);
+    InvalidateRect(window, nullptr, TRUE);
 }
 void ControlPanel::Pane::Scroll(int position) { offset = position; Reflow(); }
 
+void ControlPanel::Filter() {
+    if (!visuals_.empty || !audio_.empty) return;
+    wchar_t buffer[129]{}; GetWindowTextW(search_, buffer, 129);
+    std::wstring query = Lower(buffer);
+    size_t first = query.find_first_not_of(L" \t\r\n"), last = query.find_last_not_of(L" \t\r\n");
+    if (first == std::wstring::npos) query.clear();
+    else query = query.substr(first, last - first + 1);
+    visuals_.Filter(query); audio_.Filter(query);
+    EnableWindow(clear_, buffer[0] != 0);
+    Refresh(errorText_);
+}
+
 void ControlPanel::Layout() {
-    if (!title_) return; // Initial WM_SIZE precedes child creation.
+    if (!audio_.window) return; // Initial WM_SIZE precedes child creation.
     RECT rect{}; GetClientRect(window_, &rect);
-    int w = rect.right, h = rect.bottom, pad = Scale(24), gap = Scale(16);
-    int column = std::max(1, (w - pad * 2 - gap) / 2), right = pad + column + gap;
+    int w = rect.right, h = rect.bottom;
+    compact_ = w < Scale(720);
+    int pad = Scale(compact_ ? 16 : 24), gap = Scale(16), available = w - pad * 2;
+    int column = std::max(1, (available - gap) / 2), right = pad + column + gap;
     auto move = [](HWND child, int x, int y, int width, int height) { MoveWindow(child, x, y, std::max(1, width), std::max(1, height), TRUE); };
-    move(title_, pad, Scale(18), w - pad * 2 - Scale(140), Scale(32));
-    move(stop_, w - pad - Scale(120), Scale(18), Scale(120), Scale(34));
-    move(description_, pad, Scale(60), w - pad * 2, Scale(42));
-    move(visualsTitle_, pad, Scale(112), column, Scale(24));
-    move(audioTitle_, right, Scale(112), column, Scale(24));
-    int top = Scale(144), bottom = h - Scale(152);
-    if (visuals_.window) move(visuals_.window, pad, top, column, bottom - top);
-    if (audio_.window) move(audio_.window, right, top, w - pad - right, bottom - top);
-    move(finaleLabel_, pad, h - Scale(132), Scale(144), Scale(26));
-    move(finaleStyle_, pad + Scale(150), h - Scale(136), Scale(208), Scale(220));
-    move(status_, pad, h - Scale(94), w - pad * 2 - Scale(298), Scale(44));
-    move(finale_, w - pad - Scale(284), h - Scale(94), Scale(176), Scale(34));
-    move(close_, w - pad - Scale(96), h - Scale(94), Scale(96), Scale(34));
-    move(hint_, pad, h - Scale(42), w - pad * 2, Scale(36));
+    auto show = [](HWND child, bool visible) { ShowWindow(child, visible ? SW_SHOW : SW_HIDE); };
+    // Both columns close on the same outer edges: 2*column + gap = available.
+    move(title_, pad, Scale(18), available - Scale(128), Scale(34));
+    move(stop_, w - pad - Scale(112), Scale(18), Scale(112), Scale(36));
+    move(description_, pad, Scale(60), available, Scale(34));
+    move(searchLabel_, pad, Scale(98), available, Scale(18));
+    move(search_, pad, Scale(120), available - Scale(84), Scale(34));
+    move(clear_, w - pad - Scale(72), Scale(120), Scale(72), Scale(34));
+    show(visualsTitle_, !compact_); show(audioTitle_, !compact_);
+    show(visualTab_, compact_); show(audioTab_, compact_);
+    show(visualsHelp_, !compact_ || !audioView_); show(audioHelp_, !compact_ || audioView_);
+    show(visuals_.window, !compact_ || !audioView_); show(audio_.window, !compact_ || audioView_);
+    int statusHeight = Scale(errorText_.empty() ? 44 : (compact_ ? 76 : 60));
+    int statusY = h - Scale(54) - statusHeight;
+    int actionsY = statusY - Scale(50);
+    int top = Scale(compact_ ? 240 : 226);
+    int bottom = actionsY - Scale(compact_ ? 46 : 18);
+    if (compact_) {
+        move(visualTab_, pad, Scale(170), (available - Scale(8)) / 2, Scale(34));
+        move(audioTab_, pad + (available + Scale(8)) / 2, Scale(170), (available - Scale(8)) / 2, Scale(34));
+        move(visualsHelp_, pad, Scale(212), available, Scale(20));
+        move(audioHelp_, pad, Scale(212), available, Scale(20));
+        move(visuals_.window, pad, top, available, bottom - top);
+        move(audio_.window, pad, top, available, bottom - top);
+        move(finaleLabel_, pad, actionsY - Scale(26), available, Scale(20));
+        move(finaleStyle_, pad, actionsY, available - Scale(172), Scale(220));
+        move(finale_, w - pad - Scale(160), actionsY, Scale(160), Scale(34));
+    } else {
+        move(visualsTitle_, pad, Scale(170), column, Scale(24));
+        move(audioTitle_, right, Scale(170), w - pad - right, Scale(24));
+        move(visualsHelp_, pad, Scale(198), column, Scale(20));
+        move(audioHelp_, right, Scale(198), w - pad - right, Scale(20));
+        move(visuals_.window, pad, top, column, bottom - top);
+        move(audio_.window, right, top, w - pad - right, bottom - top);
+        move(finaleLabel_, pad, actionsY + Scale(8), Scale(128), Scale(20));
+        move(finaleStyle_, pad + Scale(136), actionsY, Scale(196), Scale(220));
+        move(finale_, w - pad - Scale(160), actionsY, Scale(160), Scale(34));
+    }
+    move(status_, pad, statusY, available, statusHeight);
+    move(hint_, pad, h - Scale(46), available - Scale(100), Scale(40));
+    move(close_, w - pad - Scale(88), h - Scale(46), Scale(88), Scale(34));
+    // Never leave keyboard focus inside a pane hidden by the compact layout.
+    HWND focus = GetFocus();
+    if (compact_ && IsChild(audioView_ ? visuals_.window : audio_.window, focus))
+        SetFocus(audioView_ ? audioTab_ : visualTab_);
+    else if (!compact_ && (focus == visualTab_ || focus == audioTab_)) SetFocus(search_);
+    InvalidateRect(window_, nullptr, TRUE);
 }
 
 void ControlPanel::Refresh(const std::wstring& error) {
     if (!window_) return;
+    bool errorChanged = errorText_ != error; errorText_ = error;
     size_t count = 0;
     for (size_t i = 0; i < visuals_.buttons.size(); ++i) {
         bool enabled = controls_.visuals[i]; count += enabled;
-        SendMessageW(visuals_.buttons[i], BM_SETCHECK, enabled ? BST_CHECKED : BST_UNCHECKED, 0);
+        HWND button = visuals_.buttons[i];
+        LRESULT check = enabled ? BST_CHECKED : BST_UNCHECKED;
+        if (SendMessageW(button, BM_GETCHECK, 0, 0) != check) { SendMessageW(button, BM_SETCHECK, check, 0); InvalidateRect(button, nullptr, TRUE); }
     }
-    for (size_t i = 0; i < audio_.buttons.size(); ++i)
-        SendMessageW(audio_.buttons[i], BM_SETCHECK, controls_.audio == int(i) ? BST_CHECKED : BST_UNCHECKED, 0);
-    std::wstring text = std::to_wstring(count) + L" visual" + (count == 1 ? L" active. " : L"s active. ");
-    text += controls_.audio < 0 ? L"Audio off." : L"Looping: " + Wide(SoundPayloads::Registry()[controls_.audio].name);
+    for (size_t i = 0; i < audio_.buttons.size(); ++i) {
+        HWND button = audio_.buttons[i];
+        LRESULT check = controls_.audio == int(i) ? BST_CHECKED : BST_UNCHECKED;
+        if (SendMessageW(button, BM_GETCHECK, 0, 0) != check) { SendMessageW(button, BM_SETCHECK, check, 0); InvalidateRect(button, nullptr, TRUE); }
+    }
+    auto heading = [](const Pane& pane, const std::wstring& name) {
+        std::wstring text = name + L" (" + std::to_wstring(pane.visible.size());
+        if (pane.visible.size() != pane.names.size()) text += L"/" + std::to_wstring(pane.names.size());
+        return text + L")";
+    };
+    Text(visualsTitle_, heading(visuals_, L"Visual effects")); Text(audioTitle_, heading(audio_, L"Audio loops"));
+    Text(visualTab_, heading(visuals_, L"Visuals")); Text(audioTab_, heading(audio_, L"Audio"));
+    bool playing = count > 0 || controls_.audio >= 0;
+    EnableWindow(stop_, playing);
+    std::wstring text = std::to_wstring(count) + (count == 1 ? L" visual active" : L" visuals active");
+    text += controls_.audio < 0 ? L"  /  Audio off" : L"  /  Audio: " + Wide(SoundPayloads::Registry()[controls_.audio].name);
     if (!error.empty()) text += L"\r\n" + error;
-    if (text != statusText_) { statusText_ = text; SetWindowTextW(status_, text.c_str()); }
+    if (text != statusText_) { statusText_ = text; Text(status_, text); }
+    if (errorChanged) Layout();
 }
 
 void ControlPanel::SetPreviewActive(bool active) {
     if (!window_ || active == previewActive_) return;
-    // Exclude the panel only while capturing visual source imagery. Idle/audio-only
-    // controls remain ordinary capturable windows for screenshots and screen readers.
+    // Idle/audio-only controls remain capturable for screenshots and accessibility.
     SetWindowDisplayAffinity(window_, active ? 0x00000011 : 0);
     previewActive_ = active;
+}
+
+bool ControlPanel::HandleMessage(const MSG& message) {
+    if (message.message != WM_KEYDOWN) return false;
+    if (message.wParam == 'F' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        SetFocus(search_); SendMessageW(search_, EM_SETSEL, 0, -1); return true;
+    }
+    if (message.wParam == VK_ESCAPE && GetWindowTextLengthW(search_) > 0 && !(GetKeyState(VK_CONTROL) & 0x8000)) {
+        Text(search_, L""); SetFocus(search_); return true;
+    }
+    return false;
 }
 
 void ControlPanel::Command(int id) {
@@ -148,14 +290,60 @@ void ControlPanel::Command(int id) {
         controls_.visuals[index] = !controls_.visuals[index];
     } else if (id >= AudioBase && id < AudioBase + int(SoundPayloads::Registry().size())) {
         int index = id - AudioBase;
-        controls_.audio = controls_.audio == index ? -1 : index;
-        ++controls_.audioRevision;
+        controls_.audio = controls_.audio == index ? -1 : index; ++controls_.audioRevision;
     } else if (id == StopAll) {
         std::fill(controls_.visuals.begin(), controls_.visuals.end(), false);
         controls_.audio = -1; ++controls_.audioRevision;
+    } else if (id == ClearSearch) { Text(search_, L""); SetFocus(search_); return; }
+    else if (id == VisualTab || id == AudioTab) {
+        audioView_ = id == AudioTab; Layout();
+        InvalidateRect(visualTab_, nullptr, TRUE); InvalidateRect(audioTab_, nullptr, TRUE);
+        return;
     } else if (id == Finale) controls_.finaleRequested = true;
     else if (id == Close) controls_.closing = true;
     Refresh();
+}
+
+void ControlPanel::DrawButton(const DRAWITEMSTRUCT& item) {
+    HDC dc = item.hDC; int saved = SaveDC(dc);
+    bool disabled = (item.itemState & ODS_DISABLED) != 0, pressed = (item.itemState & ODS_SELECTED) != 0;
+    bool tab = item.CtlID == VisualTab || item.CtlID == AudioTab;
+    bool selected = tab && (audioView_ ? item.CtlID == AudioTab : item.CtlID == VisualTab);
+    bool primary = item.CtlID == StopAll && !disabled;
+    COLORREF fill = primary ? ink_ : selected ? selected_ : surface_;
+    COLORREF text = primary ? surface_ : disabled ? GetSysColor(COLOR_GRAYTEXT) : ink_;
+    COLORREF border = selected || primary ? ink_ : RGB(193, 197, 201);
+    if (pressed || (hovered_ == item.hwndItem && !disabled)) fill = primary ? RGB(56, 59, 62) : selected_;
+    if (highContrast_) {
+        fill = selected || pressed ? GetSysColor(COLOR_HIGHLIGHT) : GetSysColor(COLOR_BTNFACE);
+        text = disabled ? GetSysColor(COLOR_GRAYTEXT) : selected || pressed ? GetSysColor(COLOR_HIGHLIGHTTEXT) : GetSysColor(COLOR_BTNTEXT);
+        border = GetSysColor(COLOR_BTNTEXT);
+    }
+    FillRect(dc, &item.rcItem, groundBrush_);
+    SelectObject(dc, GetStockObject(DC_BRUSH)); SetDCBrushColor(dc, fill);
+    SelectObject(dc, GetStockObject(DC_PEN)); SetDCPenColor(dc, border);
+    RoundRect(dc, item.rcItem.left, item.rcItem.top, item.rcItem.right, item.rcItem.bottom, Scale(8), Scale(8));
+    wchar_t label[128]{}; GetWindowTextW(item.hwndItem, label, 128);
+    SelectObject(dc, font_); SetBkMode(dc, TRANSPARENT); SetTextColor(dc, text);
+    RECT rect = item.rcItem; InflateRect(&rect, -Scale(8), 0);
+    DrawTextW(dc, label, -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER | DT_END_ELLIPSIS | DT_HIDEPREFIX);
+    if ((item.itemState & ODS_FOCUS) && !(item.itemState & ODS_NOFOCUSRECT)) {
+        rect = item.rcItem; InflateRect(&rect, -Scale(4), -Scale(4)); DrawFocusRect(dc, &rect);
+    }
+    RestoreDC(dc, saved);
+}
+
+LRESULT CALLBACK ControlPanel::ActionProc(HWND window, UINT msg, WPARAM wParam, LPARAM lParam) {
+    auto* panel = reinterpret_cast<ControlPanel*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+    if (msg == WM_MOUSEMOVE && panel->hovered_ != window) {
+        panel->hovered_ = window;
+        TRACKMOUSEEVENT track{sizeof(track), TME_LEAVE, window, 0}; TrackMouseEvent(&track);
+        InvalidateRect(window, nullptr, FALSE);
+    } else if (msg == WM_MOUSELEAVE) {
+        if (panel->hovered_ == window) panel->hovered_ = nullptr;
+        InvalidateRect(window, nullptr, FALSE);
+    }
+    return CallWindowProcW(panel->buttonProc_, window, msg, wParam, lParam);
 }
 
 LRESULT CALLBACK ControlPanel::WindowProc(HWND window, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -165,17 +353,42 @@ LRESULT CALLBACK ControlPanel::WindowProc(HWND window, UINT msg, WPARAM wParam, 
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(panel));
     }
     if (panel) {
+        if (msg == WM_ERASEBKGND) {
+            RECT rect{}; GetClientRect(window, &rect);
+            FillRect(reinterpret_cast<HDC>(wParam), &rect, panel->groundBrush_); return 1;
+        }
+        if (msg == WM_COMMAND && LOWORD(wParam) == Search && HIWORD(wParam) == EN_CHANGE) { panel->Filter(); return 0; }
         if (msg == WM_COMMAND && LOWORD(wParam) == FinaleStyle && HIWORD(wParam) == CBN_SELCHANGE) {
             LRESULT selection = SendMessageW(panel->finaleStyle_, CB_GETCURSEL, 0, 0);
             if (selection >= 0 && selection <= 5) panel->controls_.finaleStyle = static_cast<BlueScreenStyle>(selection);
             return 0;
         }
         if (msg == WM_COMMAND && HIWORD(wParam) == BN_CLICKED) { panel->Command(LOWORD(wParam)); return 0; }
+        if (msg == WM_DRAWITEM) { panel->DrawButton(*reinterpret_cast<DRAWITEMSTRUCT*>(lParam)); return TRUE; }
+        if (msg == WM_CTLCOLORSTATIC || msg == WM_CTLCOLOREDIT || msg == WM_CTLCOLORLISTBOX) {
+            HDC dc = reinterpret_cast<HDC>(wParam); HWND child = reinterpret_cast<HWND>(lParam);
+            bool field = msg != WM_CTLCOLORSTATIC;
+            bool muted = child == panel->description_ || child == panel->hint_ || child == panel->visualsHelp_ || child == panel->audioHelp_ || child == panel->searchLabel_ || child == panel->finaleLabel_;
+            SetTextColor(dc, muted ? panel->muted_ : panel->ink_);
+            SetBkColor(dc, field ? panel->surface_ : panel->ground_);
+            return reinterpret_cast<LRESULT>(field ? panel->surfaceBrush_ : panel->groundBrush_);
+        }
         if (msg == WM_SIZE) { panel->Layout(); return 0; }
+        if (msg == WM_MOUSEWHEEL) {
+            POINT point{static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+            for (auto* pane : {&panel->visuals_, &panel->audio_}) {
+                RECT rect{}; GetWindowRect(pane->window, &rect);
+                if (IsWindowVisible(pane->window) && PtInRect(&rect, point)) return SendMessageW(pane->window, msg, wParam, lParam);
+            }
+        }
         if (msg == WM_CLOSE || msg == WM_DISPLAYCHANGE || (msg == WM_ENDSESSION && wParam)) { panel->controls_.closing = true; return 0; }
         if (msg == WM_GETMINMAXINFO) {
             auto* limits = reinterpret_cast<MINMAXINFO*>(lParam);
-            limits->ptMinTrackSize = {panel->Scale(660), panel->Scale(480)};
+            RECT minimum{0, 0, panel->Scale(400), panel->Scale(540)}, work{};
+            AdjustWindowRectEx(&minimum, WS_OVERLAPPEDWINDOW, FALSE, WS_EX_TOPMOST | WS_EX_CONTROLPARENT);
+            SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+            limits->ptMinTrackSize = {std::min(LONG(minimum.right - minimum.left), work.right - work.left),
+                std::min(LONG(minimum.bottom - minimum.top), work.bottom - work.top)};
             return 0;
         }
     }
@@ -190,11 +403,27 @@ LRESULT CALLBACK ControlPanel::PaneProc(HWND window, UINT msg, WPARAM wParam, LP
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pane));
     }
     if (pane) {
+        if (msg == WM_ERASEBKGND) {
+            RECT rect{}; GetClientRect(window, &rect);
+            FillRect(reinterpret_cast<HDC>(wParam), &rect, pane->owner->surfaceBrush_); return 1;
+        }
         if (msg == WM_SIZE) { pane->Reflow(); return 0; }
+        if (msg == WM_CTLCOLORBTN || msg == WM_CTLCOLORSTATIC) {
+            // Windows can send WM_CTLCOLORSTATIC for checkbox backgrounds too.
+            bool selected = reinterpret_cast<HWND>(lParam) != pane->empty &&
+                SendMessageW(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0) == BST_CHECKED;
+            auto* panel = pane->owner; HDC dc = reinterpret_cast<HDC>(wParam);
+            SetTextColor(dc, selected && panel->highContrast_ ? GetSysColor(COLOR_HIGHLIGHTTEXT) : panel->ink_);
+            SetBkColor(dc, selected ? panel->selected_ : panel->surface_);
+            return reinterpret_cast<LRESULT>(selected ? panel->selectedBrush_ : panel->surfaceBrush_);
+        }
         if (msg == WM_MOUSEWHEEL) {
             pane->wheel += static_cast<short>(HIWORD(wParam));
-            int lines = pane->wheel / WHEEL_DELTA; pane->wheel %= WHEEL_DELTA;
-            pane->Scroll(pane->offset - lines * pane->row * 3); return 0;
+            int steps = pane->wheel / WHEEL_DELTA; pane->wheel %= WHEEL_DELTA;
+            UINT lines = 3; SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
+            RECT rect{}; GetClientRect(window, &rect);
+            int distance = lines == WHEEL_PAGESCROLL ? int(rect.bottom) : int(lines) * pane->row;
+            pane->Scroll(pane->offset - steps * distance); return 0;
         }
         if (msg == WM_VSCROLL) {
             SCROLLINFO info{sizeof(SCROLLINFO), SIF_ALL, 0, 0, 0, 0, 0}; GetScrollInfo(window, SB_VERT, &info);
@@ -215,8 +444,8 @@ LRESULT CALLBACK ControlPanel::PaneProc(HWND window, UINT msg, WPARAM wParam, LP
             if (HIWORD(wParam) == BN_SETFOCUS) {
                 RECT child{}, client{}; GetWindowRect(reinterpret_cast<HWND>(lParam), &child);
                 MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&child), 2); GetClientRect(window, &client);
-                if (child.top < 0) pane->Scroll(pane->offset + child.top - 6);
-                else if (child.bottom > client.bottom) pane->Scroll(pane->offset + child.bottom - client.bottom + 6);
+                if (child.top < 0) pane->Scroll(pane->offset + child.top - pane->inset);
+                else if (child.bottom > client.bottom) pane->Scroll(pane->offset + child.bottom - client.bottom + pane->inset);
             }
             return SendMessageW(GetParent(window), msg, wParam, lParam);
         }
