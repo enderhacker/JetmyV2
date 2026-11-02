@@ -16,7 +16,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int) {
     }
     LocalFree(args);
     if (help || !valid) {
-        MessageBoxW(nullptr, L"JetmyV2.exe\n  Start the automatic 100-second show.\n\nJetmyV2.exe --menu\n  Open manual visual and looping-audio controls.\n\nEmergency exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.",
+        MessageBoxW(nullptr, L"JetmyV2.exe\n  Start the 100-second show, followed by a 10-second simulated blue screen.\n\nJetmyV2.exe --menu\n  Open manual payload controls and the blue-screen preview.\n\nEmergency exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.\nBlue-screen preview: Escape also exits early.",
             valid ? L"JetmyV2 - Usage" : L"JetmyV2 - Unknown argument", MB_OK | (valid ? MB_ICONINFORMATION : MB_ICONERROR));
         return valid ? 0 : 2;
     }

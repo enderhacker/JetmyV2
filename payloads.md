@@ -1,6 +1,6 @@
 # Payloads
 
-All 47 payloads: 32 visual effects and 15 sounds. Use `JetmyV2.exe --menu`
+All 48 payloads: 32 visual effects, one finale and 15 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -40,6 +40,17 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | XOR Color Chaos | Animated XOR patterns mix the desktop's colors into moving geometric interference. |
 | Screen Color Inversion | Inverts every desktop color while enabled, without changing display settings. |
 | Popup Cascade | 24 simulated system messages with OS-aware XP, Vista/7, Windows 10 or Windows 11 styling, system fonts, DPI-scaled layouts and status icons; no real dialogs open. |
+
+## Finale
+
+**Simulated Blue Screen:** always follows the automatic 100-second show, or runs
+from the menu's **Blue screen (10s)** button. Stops all visuals and audio, then
+shows a centered 4:3 classic crash screen for 10 seconds with black surrounding
+space and the cursor hidden over the presentation. Other monitors are blacked out.
+Afterward, automatic mode exits; manual mode returns with all payloads off.
+No crash, reboot, memory dump, display-mode change or global input lock occurs.
+Ordinary input is consumed only while its window has focus. Escape and emergency
+shortcuts can exit early; system shortcuts remain available.
 
 ## Sound payloads
 

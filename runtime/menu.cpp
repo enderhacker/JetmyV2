@@ -6,7 +6,7 @@ namespace Runtime {
 namespace {
 constexpr wchar_t MenuClass[] = L"JetmyPayloadControlPanel";
 constexpr wchar_t PaneClass[] = L"JetmyPayloadControlPane";
-constexpr int VisualBase = 1000, AudioBase = 2000, StopAll = 10, Close = 11;
+constexpr int VisualBase = 1000, AudioBase = 2000, StopAll = 10, Close = 11, Finale = 12;
 std::wstring Wide(const char* text) { return std::wstring(text, text + strlen(text)); } // Registry names are ASCII.
 }
 
@@ -60,6 +60,7 @@ void ControlPanel::Create() {
     audioTitle_ = Add(window_, L"STATIC", L"Looping audio (" + std::to_wstring(SoundPayloads::Registry().size()) + L")", SS_LEFT);
     stop_ = Add(window_, L"BUTTON", L"Stop all", BS_PUSHBUTTON | WS_TABSTOP, StopAll);
     close_ = Add(window_, L"BUTTON", L"Close", BS_PUSHBUTTON | WS_TABSTOP, Close);
+    finale_ = Add(window_, L"BUTTON", L"Blue screen (10s)", BS_PUSHBUTTON | WS_TABSTOP, Finale);
     status_ = Add(window_, L"STATIC", std::wstring{}, SS_LEFT);
     hint_ = Add(window_, L"STATIC", L"Flashing visuals / electronic audio. Emergency exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.", SS_LEFT);
     for (auto* pane : {&visuals_, &audio_}) {
@@ -105,7 +106,8 @@ void ControlPanel::Layout() {
     int top = Scale(144), bottom = h - Scale(112);
     if (visuals_.window) move(visuals_.window, pad, top, column, bottom - top);
     if (audio_.window) move(audio_.window, right, top, w - pad - right, bottom - top);
-    move(status_, pad, h - Scale(94), w - pad * 2 - Scale(110), Scale(44));
+    move(status_, pad, h - Scale(94), w - pad * 2 - Scale(298), Scale(44));
+    move(finale_, w - pad - Scale(284), h - Scale(94), Scale(176), Scale(34));
     move(close_, w - pad - Scale(96), h - Scale(94), Scale(96), Scale(34));
     move(hint_, pad, h - Scale(42), w - pad * 2, Scale(36));
 }
@@ -144,7 +146,8 @@ void ControlPanel::Command(int id) {
     } else if (id == StopAll) {
         std::fill(controls_.visuals.begin(), controls_.visuals.end(), false);
         controls_.audio = -1; ++controls_.audioRevision;
-    } else if (id == Close) controls_.closing = true;
+    } else if (id == Finale) controls_.finaleRequested = true;
+    else if (id == Close) controls_.closing = true;
     Refresh();
 }
 

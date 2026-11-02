@@ -9,6 +9,7 @@ struct Controls {
     int audio = -1;
     uint64_t audioRevision = 0;
     bool closing = false;
+    bool finaleRequested = false;
 };
 
 // Native Win32 controls retain keyboard navigation, focus and accessibility.
@@ -40,6 +41,7 @@ private:
     Controls& controls_;
     HWND window_ = nullptr, title_ = nullptr, description_ = nullptr;
     HWND visualsTitle_ = nullptr, audioTitle_ = nullptr, stop_ = nullptr, close_ = nullptr, status_ = nullptr, hint_ = nullptr;
+    HWND finale_ = nullptr;
     Pane visuals_, audio_;
     HFONT font_ = nullptr, titleFont_ = nullptr;
     int dpi_ = 96;
