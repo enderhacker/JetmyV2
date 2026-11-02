@@ -8,6 +8,7 @@
 #endif
 #include <windows.h>
 #include <mmsystem.h>
+#include <array>
 #include <cstdint>
 #include <random>
 #include <vector>
@@ -19,6 +20,9 @@ struct Voice {
     std::mt19937& random;
     uint32_t noiseState;
     float phase = 0, secondPhase = 0, frequency = 440, sweep = 0, filteredNoise = 0;
+    std::array<uint32_t, 8> songPhase{}, songIncrement{};
+    std::array<int, 8> songNote{};
+    std::array<float, 4> memory{};
     float Noise() {
         noiseState ^= noiseState << 13;
         noiseState ^= noiseState >> 17;
@@ -35,6 +39,16 @@ float BytebeatMelody(uint32_t, Voice&);
 float BytebeatArpeggio(uint32_t, Voice&);
 float RandomChirps(uint32_t, Voice&);
 float NoisePercussion(uint32_t, Voice&);
+float BytebeatNeonDrive(uint32_t, Voice&);
+float BytebeatPocketGroove(uint32_t, Voice&);
+float BytebeatCrystalWaltz(uint32_t, Voice&);
+float BytebeatArcadeQuest(uint32_t, Voice&);
+float BytebeatMidnightKeys(uint32_t, Voice&);
+float BytebeatDuskBreaks(uint32_t, Voice&);
+float SonarSoundscape(uint32_t, Voice&);
+float GlassBells(uint32_t, Voice&);
+float RainOnMetal(uint32_t, Voice&);
+float CosmicDrone(uint32_t, Voice&);
 std::vector<int16_t> Synthesize(Generator generator, unsigned seconds, std::mt19937& random);
 
 // One device and one owned buffer: replacing a sound always resets the old one.

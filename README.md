@@ -1,6 +1,6 @@
 # Visual and sound payload demo
 
-Windows desktop overlay with 25 visual effects and five synthesized sounds.
+Windows desktop overlay with 25 visual effects and 15 synthesized sounds.
 Effects only draw into the overlay; they do not modify the desktop itself.
 
 ## Sequence
@@ -78,3 +78,19 @@ and 30 ms clip-edge fades. Consecutive sound stages never select the same sound.
 | Bytebeat Arpeggio | Fast high-register dual-oscillator chip arpeggio. |
 | Random Chirps | Randomized ascending/descending whistles separated by silence. |
 | Noise Percussion | Sixteen-step kick, snare and high-passed noise-hat pattern. |
+| Bytebeat Neon Drive | Minor-key synthwave song with pulse lead, filtered bass, arpeggios and drums. |
+| Bytebeat Pocket Groove | Swung pentatonic groove with plucked bass and offbeat chord stabs. |
+| Bytebeat Crystal Waltz | Six-bar music-box waltz with melody, alternating bass and chords. |
+| Bytebeat Arcade Quest | Major-key game-theme song with square-wave harmony and counter percussion. |
+| Bytebeat Midnight Keys | Mellow electric-piano-style jazz voicings, melodic fills and brushed noise. |
+| Bytebeat Dusk Breaks | Minor acid-bass sequence with a syncopated breakbeat and bright arpeggio. |
+| Sonar Soundscape | Spaced underwater pings, delayed echoes and a low ambient bed. |
+| Glass Bells | Clear pitched bells with independently decaying overtones. |
+| Rain on Metal | Filtered rainfall with randomized metallic droplets. |
+| Cosmic Drone | Slowly swelling root/fifth/ninth harmony and soft noise breath. |
+
+The six new songs are original bytebeat/chiptune-style compositions, not recordings
+or recreations of existing songs. Integer phase counters generate quantized voices;
+explicit note sequences, rests, envelopes and percussion provide musical structure.
+Each arrangement fits a ten-second sound stage, including a six-bar 3/4 waltz.
+All 15 sounds share the same single-player replacement and output-limiting path.
