@@ -4,16 +4,31 @@
 #include <cstdint>
 #include <cstring>
 #include <cwchar>
+#include <objidl.h> // PROPID/IStream declarations required by MinGW's GDI+ headers with lean Windows headers.
+#include <gdiplus.h>
 #include <stdexcept>
 
 namespace Runtime {
 namespace {
-void Text(HDC dc, int x, int y, const wchar_t* text) {
-    TextOutW(dc, x, y, text, int(std::wcslen(text)));
-}
+class FontRenderer {
+    ULONG_PTR token_ = 0;
+public:
+    FontRenderer() {
+        Gdiplus::GdiplusStartupInput startup;
+        if (Gdiplus::GdiplusStartup(&token_, &startup, nullptr) != Gdiplus::Ok)
+            throw std::runtime_error("Cannot initialize blue-screen font rendering.");
+    }
+    ~FontRenderer() { Gdiplus::GdiplusShutdown(token_); }
+    FontRenderer(const FontRenderer&) = delete;
+    FontRenderer& operator=(const FontRenderer&) = delete;
+};
 void Fill(HDC dc, RECT rect, COLORREF color) {
-    SetDCBrushColor(dc, color);
-    FillRect(dc, &rect, static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+    GdiFlush();
+    Gdiplus::Graphics graphics(dc);
+    graphics.SetCompositingMode(Gdiplus::CompositingModeSourceCopy);
+    Gdiplus::SolidBrush brush(Gdiplus::Color(255, GetRValue(color), GetGValue(color), GetBValue(color)));
+    graphics.FillRectangle(&brush, Gdiplus::Rect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top));
+    graphics.Flush(Gdiplus::FlushIntentionSync);
 }
 uint8_t Multiply(uint8_t a, uint8_t b) {
     unsigned result = 0, value = a;
@@ -97,8 +112,9 @@ public:
             }
         }
     }
-    void Draw(HDC dc, int left, int top, COLORREF ink) const {
-        constexpr int scale = 3, quiet = 4, extent = (Size + quiet * 2) * scale;
+    void Draw(HDC dc, int left, int top, int scale, COLORREF ink) const {
+        constexpr int quiet = 4;
+        const int extent = (Size + quiet * 2) * scale;
         Fill(dc, {left, top, left + extent, top + extent}, RGB(255, 255, 255));
         for (int y = 0; y < Size; ++y) for (int x = 0; x < Size; ++x) if (modules_[y][x]) {
             int px = left + (x + quiet) * scale, py = top + (y + quiet) * scale;
@@ -123,17 +139,29 @@ BlueScreenStyle DetectBlueScreenStyle() {
     if (version.dwMajorVersion >= 10 && version.dwBuildNumber >= 22000) return BlueScreenStyle::Windows11;
     return BlueScreenStyle::Windows10;
 }
-BlueScreenArtwork::BlueScreenArtwork(BlueScreenStyle requested)
+BlueScreenArtwork::BlueScreenArtwork(BlueScreenStyle requested, int pixelWidth, int pixelHeight)
     : style_(requested == BlueScreenStyle::Automatic ? DetectBlueScreenStyle() : requested) {
+    if (pixelWidth < 0 || pixelHeight < 0 || (pixelWidth == 0) != (pixelHeight == 0))
+        throw std::invalid_argument("Blue-screen dimensions must both be positive or both zero.");
+    if (pixelWidth == 0) {
+        height_ = std::max(1, std::min(GetSystemMetrics(SM_CYSCREEN), GetSystemMetrics(SM_CXSCREEN) * 3 / 4));
+        width_ = std::max(1, height_ * 4 / 3);
+    } else {
+        width_ = pixelWidth; height_ = pixelHeight;
+    }
+    // Keep GDI+ alive across repeated menu previews and its internal font caches.
+    static FontRenderer renderer;
     bool xp = style_ == BlueScreenStyle::XP;
-    body_ = CreateFontW(Modern() ? -30 : xp ? -12 : -16, Modern() ? 0 : xp ? 7 : 8, 0, 0,
+    // Rasterize outlines at the final pixel size, never enlarge an already rendered font.
+    // Grayscale antialiasing also avoids ClearType color fringes on the off-screen DIB.
+    body_ = CreateFontW(-std::max(1, Y(Modern() ? 30 : xp ? 12 : 16)), Modern() ? 0 : std::max(1, X(xp ? 7 : 8)), 0, 0,
         Modern() ? FW_LIGHT : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-        CLIP_DEFAULT_PRECIS, Modern() ? ANTIALIASED_QUALITY : NONANTIALIASED_QUALITY,
+        CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
         Modern() ? DEFAULT_PITCH : FIXED_PITCH, Modern() ? L"Segoe UI" : L"Lucida Console");
     if (Modern()) {
-        detail_ = CreateFontW(-19, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        detail_ = CreateFontW(-std::max(1, Y(19)), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
             OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-        face_ = CreateFontW(-164, 0, 0, 0, FW_LIGHT, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+        face_ = CreateFontW(-std::max(1, Y(164)), 0, 0, 0, FW_LIGHT, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
             OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH, L"Segoe UI");
     }
     if (!body_ || (Modern() && (!detail_ || !face_))) {
@@ -149,12 +177,15 @@ BlueScreenArtwork::~BlueScreenArtwork() {
     if (face_) DeleteObject(face_);
 }
 bool BlueScreenArtwork::Modern() const { return style_ == BlueScreenStyle::Windows10 || style_ == BlueScreenStyle::Windows11; }
-int BlueScreenArtwork::Width() const { return Modern() ? 1280 : style_ == BlueScreenStyle::XP ? 640 : 800; }
-int BlueScreenArtwork::Height() const { return Width() * 3 / 4; }
+int BlueScreenArtwork::LayoutWidth() const { return Modern() ? 1280 : style_ == BlueScreenStyle::XP ? 640 : 800; }
+int BlueScreenArtwork::X(int value) const { return MulDiv(value, width_, LayoutWidth()); }
+int BlueScreenArtwork::Y(int value) const { return MulDiv(value, height_, LayoutWidth() * 3 / 4); }
+int BlueScreenArtwork::Width() const { return width_; }
+int BlueScreenArtwork::Height() const { return height_; }
 RECT BlueScreenArtwork::ProgressRect() const {
-    if (Modern()) return {100, 445, 700, 493};
-    if (style_ == BlueScreenStyle::XP) return {20, 438, 620, 454};
-    return {24, 546, 776, 570};
+    RECT logical = Modern() ? RECT{100, 445, 900, 500} : style_ == BlueScreenStyle::XP ?
+        RECT{20, 438, 620, 458} : RECT{24, 546, 776, 576};
+    return {X(logical.left), Y(logical.top), X(logical.right), Y(logical.bottom)};
 }
 void BlueScreenArtwork::Draw(HDC dc, int percent, bool initial) const {
     int saved = SaveDC(dc);
@@ -163,30 +194,53 @@ void BlueScreenArtwork::Draw(HDC dc, int percent, bool initial) const {
     RECT entire{0, 0, Width(), Height()};
     Fill(dc, initial ? entire : ProgressRect(), blue);
     SelectObject(dc, body_); SetTextColor(dc, RGB(255, 255, 255)); SetBkMode(dc, TRANSPARENT);
+    SetTextAlign(dc, TA_LEFT | TA_TOP | TA_NOUPDATECP);
+    auto text = [&](int x, int y, const wchar_t* value) {
+        GdiFlush(); // Synchronize earlier GDI work before GDI+ accesses the shared DIB.
+        // Explicit grayscale rasterization works even when desktop font smoothing
+        // is disabled. Never change the user's font-smoothing/ClearType settings.
+        Gdiplus::Graphics graphics(dc);
+        graphics.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+        Gdiplus::Font font(dc, static_cast<HFONT>(GetCurrentObject(dc, OBJ_FONT)));
+        Gdiplus::SolidBrush white(Gdiplus::Color(255, 255, 255));
+        Gdiplus::StringFormat format(Gdiplus::StringFormat::GenericTypographic());
+        format.SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap | Gdiplus::StringFormatFlagsNoClip);
+        Gdiplus::Status status = graphics.DrawString(value, -1, &font,
+            Gdiplus::PointF(static_cast<float>(X(x)), static_cast<float>(Y(y))), &format, &white);
+        graphics.Flush(Gdiplus::FlushIntentionSync);
+        if (status != Gdiplus::Ok) {
+            RestoreDC(dc, saved);
+            throw std::runtime_error("Cannot render blue-screen text.");
+        }
+    };
+    percent = std::clamp(percent, 0, 100);
     wchar_t progress[96]{};
     if (Modern()) {
         if (initial) {
-            SelectObject(dc, face_); Text(dc, 91, 110, L":(");
+            SelectObject(dc, face_); text(91, 110, L":(");
             SelectObject(dc, body_);
-            Text(dc, 100, 330, style_ == BlueScreenStyle::Windows11 ?
+            text(100, 330, style_ == BlueScreenStyle::Windows11 ?
                 L"Your device ran into a problem and needs to restart." : L"Your PC ran into a problem and needs to restart.");
-            Text(dc, 100, 374, L"We're just collecting some error info, and then we'll restart for you.");
+            text(100, 374, L"We're just collecting some error info, and then we'll restart for you.");
             static const SupportQR qr;
-            qr.Draw(dc, 100, 553, blue);
+            // QR modules remain whole physical pixels, with a four-module quiet zone.
+            // Fit whole modules inside the QR slot and preserve the support-text gutter.
+            const int module = std::max(1, std::min(X(111), Y(111)) / 37);
+            qr.Draw(dc, X(100), Y(553), module, blue);
             SelectObject(dc, detail_);
-            Text(dc, 237, 554, L"For more information about this issue and possible fixes, visit");
-            Text(dc, 237, 582, L"https://www.windows.com/stopcode");
-            Text(dc, 237, 626, L"If you call a support person, give them this info:");
-            Text(dc, 237, 654, L"Stop code: PAGE FAULT IN NONPAGED AREA");
-            Text(dc, 237, 682, L"What failed: win32k.sys");
+            text(237, 554, L"For more information about this issue and possible fixes, visit");
+            text(237, 582, L"https://www.windows.com/stopcode");
+            text(237, 626, L"If you call a support person, give them this info:");
+            text(237, 654, L"Stop code: PAGE FAULT IN NONPAGED AREA");
+            text(237, 682, L"What failed: win32k.sys");
         }
         SelectObject(dc, body_);
         std::swprintf(progress, 96, L"%d%% complete", percent);
-        Text(dc, 100, 450, progress);
+        text(100, 450, progress);
     } else {
         bool xp = style_ == BlueScreenStyle::XP;
         int x = xp ? 20 : 24, y = xp ? 22 : 26, step = xp ? 16 : 20;
-        auto line = [&](int row, const wchar_t* text) { Text(dc, x, y + row * step, text); };
+        auto line = [&](int row, const wchar_t* value) { text(x, y + row * step, value); };
         if (initial) {
             line(0, L"A problem has been detected and Windows has been shut down to prevent");
             line(1, L"damage to your computer.");

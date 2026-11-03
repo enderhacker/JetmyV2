@@ -118,19 +118,16 @@ public:
         // The text is cosmetic. No memory dump, file write, crash, or reboot occurs.
         if (initial) InvalidateRect(window, nullptr, FALSE);
         else {
-            RECT rect = artwork.ProgressRect();
+            RECT dirty = artwork.ProgressRect();
             RECT image = ImageRect();
-            RECT dirty{image.left + rect.left * (image.right - image.left) / artwork.Width(),
-                image.top + rect.top * (image.bottom - image.top) / artwork.Height(),
-                image.left + (rect.right * (image.right - image.left) + artwork.Width() - 1) / artwork.Width(),
-                image.top + (rect.bottom * (image.bottom - image.top) + artwork.Height() - 1) / artwork.Height()};
+            OffsetRect(&dirty, image.left, image.top); // Artwork is already in presentation pixels.
             InvalidateRect(window, &dirty, FALSE);
         }
     }
     RECT ImageRect() const {
         // Keep the 4:3 image centered on the primary display; other monitors stay black.
         int screenW = GetSystemMetrics(SM_CXSCREEN), screenH = GetSystemMetrics(SM_CYSCREEN);
-        int height = std::min(screenH, screenW * 3 / 4), width = height * 4 / 3;
+        int height = artwork.Height(), width = artwork.Width();
         int x = (screenW - width) / 2 - GetSystemMetrics(SM_XVIRTUALSCREEN);
         int y = (screenH - height) / 2 - GetSystemMetrics(SM_YVIRTUALSCREEN);
         return {x, y, x + width, y + height};
@@ -147,9 +144,9 @@ public:
         for (const auto& bar : bars)
             if (bar.right > bar.left && bar.bottom > bar.top)
                 FillRect(dc, &bar, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
-        SetStretchBltMode(dc, COLORONCOLOR);
-        StretchBlt(dc, image.left, image.top, image.right - image.left, image.bottom - image.top,
-            canvas, 0, 0, artwork.Width(), artwork.Height(), SRCCOPY);
+        // Canvas and presentation have identical physical dimensions. In particular,
+        // do not nearest-neighbor upscale classic text or the modern QR code.
+        BitBlt(dc, image.left, image.top, artwork.Width(), artwork.Height(), canvas, 0, 0, SRCCOPY);
         EndPaint(window, &paint);
     }
     static LRESULT CALLBACK Procedure(HWND window, UINT msg, WPARAM wParam, LPARAM lParam) {

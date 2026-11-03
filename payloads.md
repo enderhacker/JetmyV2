@@ -50,6 +50,8 @@ from the menu's **Blue screen (10s)** button. Stops all visuals and audio, then
 shows a centered 4:3 version-specific crash screen for 10 seconds with a continuous 800 Hz
 error tone at bounded amplitude and black surrounding
 space and the cursor hidden over the presentation. Other monitors are blacked out.
+Artwork uses a native-resolution canvas, antialiased outline fonts and whole-pixel
+QR modules, without upscaling low-resolution screenshots or changing system settings.
 Afterward, automatic mode exits; manual mode returns with all payloads off.
 No crash, reboot, memory dump, display-mode change or global input lock occurs.
 Ordinary input is consumed only while its window has focus. Escape and emergency

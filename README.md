@@ -211,11 +211,15 @@ restarting or dumping memory are cosmetic. No such operation takes place.
 The screen is displayed in a **centered 4:3 area on the primary monitor**, with
 black surrounding space. A topmost presentation window also covers other
 monitors in black. It does not change monitor resolution or orientation.
+Artwork is rendered at the presentation's native pixel dimensions and copied
+one-to-one, rather than enlarging a low-resolution bitmap. Fonts use explicit
+grayscale antialiasing independently of Windows font-smoothing settings; QR
+modules are drawn at whole-pixel sizes to keep their edges crisp.
 
 | Style | Appearance |
 | --- | --- |
 | Automatic | Detects the host Windows version and chooses the corresponding preset. |
-| Windows XP | Low-resolution, monospaced white-on-dark-blue STOP diagnostics and memory-dump counter. |
+| Windows XP | Classic monospaced white-on-dark-blue STOP diagnostics and memory-dump counter, rendered sharply at the presentation resolution. |
 | Windows Vista | Classic diagnostic layout with wider addresses and a memory-dump progress line. |
 | Windows 7 | Classic STOP layout with crash-dump collection and initialization messages. |
 | Windows 10 | Brighter blue background, Segoe UI text, large sad face, percentage, QR code, and stop-code details. |
@@ -275,7 +279,7 @@ g++ --version
 
 The script compiles `main.cpp` and the C++ modules in `runtime/`,
 `payloads/visual/`, and `payloads/sound/` into **`JetmyV2.exe`**. It enables
-optimization, link-time optimization, and static runtime linking. Windows GDI,
+optimization, link-time optimization, and static runtime linking. Windows GDI/GDI+,
 User32, WinMM, and Shell32 provide drawing, windowing, audio, and argument parsing.
 Popup theming functions are loaded dynamically when available.
 

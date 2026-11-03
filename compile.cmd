@@ -42,24 +42,31 @@ $SourcePatterns = @(
 )
 
 # ------------------------------------------------------------------------------
-# 1. Locate g++ (PATH or common WinGet / MSYS2 paths)
+# 1. Locate g++ (Prefers 32-bit i686 if present, falls back to 64-bit x86_64)
 # ------------------------------------------------------------------------------
 function Find-Compiler {
-    $cmd = Get-Command "g++.exe" -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-
     $knownPaths = @(
+        # 32-bit locations
+        "C:\msys64\mingw32\bin\g++.exe",
+        "C:\mingw32\bin\g++.exe",
+        "C:\MinGW\bin\g++.exe",
+        "C:\TDM-GCC-32\bin\g++.exe",
+        # 64-bit locations (WinLibs WinGet, MSYS2, TDM)
         "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.*\mingw64\bin\g++.exe",
         "C:\msys64\ucrt64\bin\g++.exe",
         "C:\msys64\mingw64\bin\g++.exe",
-        "C:\TDM-GCC-64\bin\g++.exe",
-        "C:\MinGW\bin\g++.exe",
-        "C:\mingw64\bin\g++.exe"
+        "C:\mingw64\bin\g++.exe",
+        "C:\TDM-GCC-64\bin\g++.exe"
     )
+
     foreach ($pattern in $knownPaths) {
         $found = Resolve-Path $pattern -ErrorAction SilentlyContinue
         if ($found) { return $found[0].Path }
     }
+
+    $cmd = Get-Command "g++.exe" -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
     return $null
 }
 
@@ -67,8 +74,6 @@ $gppPath = Find-Compiler
 
 if (-not $gppPath) {
     Write-Host "[!] ERROR: g++ was not found in PATH or standard installation paths." -ForegroundColor Red
-    Write-Host "    Install it via WinGet by running:" -ForegroundColor Yellow
-    Write-Host "    winget install BrechtSanders.WinLibs.POSIX.UCRT" -ForegroundColor White
     exit 1
 }
 
@@ -136,7 +141,22 @@ if ($gppPath -match ' ') {
 
 try {
     # --------------------------------------------------------------------------
-    # 5. Compile Resource File (.rc) if Present
+    # 5. Architecture & Windows Subsystem Version Setup
+    # --------------------------------------------------------------------------
+    $machine = (& $gppPath -dumpmachine).Trim()
+
+    if ($machine -match "i686|i386") {
+        Write-Host "[*] Architecture: x86 (32-bit) -> Universally executable (Win 7-11, x86/x64/ARM64)" -ForegroundColor Cyan
+        $subsystemArg = "-Wl,--subsystem,windows:5.1"
+        $windresTarget = "pe-i386"
+    } else {
+        Write-Host "[*] Architecture: x86_64 (64-bit) -> Executable on Win 7, 10, 11 (x64 and Win11 ARM64)" -ForegroundColor Cyan
+        $subsystemArg = "-Wl,--subsystem,windows:6.1"
+        $windresTarget = "pe-x86-64"
+    }
+
+    # --------------------------------------------------------------------------
+    # 6. Compile Resource File (.rc) if Present
     # --------------------------------------------------------------------------
     $rcFile = $null
     if (Test-Path "version.rc") {
@@ -149,23 +169,13 @@ try {
         $windresPath = Join-Path $binDir "windres.exe"
         if (Test-Path $windresPath) {
             Write-Host "[*] Compiling $rcFile -> $resObj..." -ForegroundColor Cyan
-            & $windresPath "-i" $rcFile "-o" $resObj "--input-format=rc" "--output-format=coff"
+            & $windresPath "-F" $windresTarget "-i" $rcFile "-o" $resObj "--input-format=rc" "--output-format=coff"
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "[!] ERROR: windres failed to compile $rcFile" -ForegroundColor Red
                 exit $LASTEXITCODE
             }
             $Sources.Add($resObj)
         }
-    }
-
-    # --------------------------------------------------------------------------
-    # 6. Target Architecture & Multithread Detection
-    # --------------------------------------------------------------------------
-    $machine = & $gppPath -dumpmachine
-    if ($machine -match "x86_64") {
-        $subsystemArg = "-Wl,--subsystem,windows:5.2"
-    } else {
-        $subsystemArg = "-Wl,--subsystem,windows:5.1"
     }
 
     # --------------------------------------------------------------------------
@@ -190,14 +200,14 @@ try {
         "-Wextra"
         "-Wno-unused-parameter"
 
-        # === SPEED & MULTITHREADED OPTIMIZATION ===
+        # === OPTIMIZATIONS ===
         "-O3"
         "-ffast-math"
         "-funroll-loops"
         "-mtune=generic"
-        "-flto=auto"            # <--- Eliminates the serial LTRANS warning, compiles across all CPU cores
+        "-flto=auto"
 
-        # === ANTI-DECOMPILATION & STRIPPING ===
+        # === SIZE REDUCTION & CLEAN BINARY ===
         "-s"
         "-fno-ident"
         "-fno-rtti"
@@ -207,17 +217,18 @@ try {
         "-fdata-sections"
         "-Wl,--gc-sections"
 
-        # === OS COMPATIBILITY ===
+        # === OS COMPATIBILITY (Windows 7+ Subsystem) ===
         $subsystemArg
         "-mwindows"
 
-        # === STANDALONE PORTABILITY ===
+        # === STANDALONE ZERO-DEPENDENCY LINKING ===
         "-static"
         "-static-libgcc"
         "-static-libstdc++"
 
         # === LINKED LIBRARIES ===
         "-lgdi32"
+        "-lgdiplus"
         "-luser32"
         "-lwinmm"
         "-lshell32"
@@ -236,7 +247,7 @@ try {
     }
 
     # --------------------------------------------------------------------------
-    # 8. Success Output with Elapsed Time
+    # 8. Success Output
     # --------------------------------------------------------------------------
     $BuildTimer.Stop()
     $elapsedStr = Format-Elapsed $BuildTimer.Elapsed
@@ -249,7 +260,6 @@ try {
     Write-Host "[+] Size   : $sizeKb KB ($($fileInfo.Length) bytes)" -ForegroundColor Gray
 }
 finally {
-    # Clean up temporary resource object
     if (Test-Path $resObj) {
         Remove-Item $resObj -Force -ErrorAction SilentlyContinue
     }

@@ -6,6 +6,7 @@
 - The build discovers `runtime/*.cpp`, `payloads/visual/*.cpp`, and `payloads/sound/*.cpp` automatically. Keep test entrypoints outside those directories. `version.rc` embeds the manifest/version metadata when `windres` is available.
 - For focused checks, use the PowerShell compile/run block in `tests/README.md`. It exercises five selected visuals and every registered sound, but not the other visuals, menu, finale, or live audio streaming. Keep assertions enabled (`-DNDEBUG` disables the checks).
 - When invoking the compiler directly, prepend its `bin` directory to the process `PATH`, as the test instructions do; finding `g++.exe` alone may not suffice for its subprocesses/runtime DLLs.
+- `tests/README.md` also has a separate off-screen blue-screen artwork test. Direct builds linking `runtime/blue_screen.cpp` need `-lgdiplus`; keep its canvas at presentation pixel dimensions and use 1:1 blits, not low-resolution bitmap upscaling.
 - Never launch `.\JetmyV2.exe` without arguments as an automated smoke test: it immediately starts flashing visuals and audio. For user-requested interactive checks, `.\JetmyV2.exe --menu` starts with all effects off. Exit with Ctrl+Shift+Q or Ctrl+Shift+Esc; Escape also exits during the finale.
 - `*.exe` and `resources.o` are ignored build artifacts; a pre-existing executable does not establish that current sources were built.
 
