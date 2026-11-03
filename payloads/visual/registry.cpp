@@ -44,7 +44,9 @@ const std::vector<PayloadRecord>& Registry() {
         { "Infinite Tunnel", EffectInfiniteTunnel },
         { "XOR Color Chaos", EffectXorColorChaos },
         { "Screen Color Inversion", EffectScreenColorInversion, false },
-        { "Popup Cascade", EffectPopupCascade, false }
+        { "Popup Cascade", EffectPopupCascade, false },
+        { "Random Square Paint", EffectRandomSquarePaint, false },
+        { "Chaos Shader", EffectChaosShader }
     };
     return payloads;
 }

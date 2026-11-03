@@ -165,5 +165,7 @@ void EffectInfiniteTunnel(float, float);
 void EffectXorColorChaos(float, float);
 void EffectScreenColorInversion(float, float);
 void EffectPopupCascade(float, float);
+void EffectRandomSquarePaint(float, float);
+void EffectChaosShader(float, float);
 
 } // namespace VisualPayloads
