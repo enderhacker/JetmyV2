@@ -1,6 +1,6 @@
 # Payloads
 
-All 60 payloads: 41 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
+All 53 payloads: 34 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -8,20 +8,18 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 
 | Payload | Quick summary |
 | --- | --- |
-| Pixel Fireworks | Rockets burst into colorful, falling sparks with fading trails. |
 | Chaos Rectangles | Random architectural panels appear and change across the screen. |
 | Black Hole Singularities | A randomly placed black hole wanders with smoothly changing random direction and speed, bending the desktop around its dark center and glowing rim. |
 | Desktop Glass Shatter | The desktop breaks into irregular triangular shards with randomized falls and spins. |
 | Living Digital Infection | Branching digital filaments spread over the desktop with glowing tips and permanent trails until restarted. |
 | Impossible Windows | Moving windows show recursive desktop views with nested title bars. |
 | Liquid Desktop | Gentle intersecting waves distort the desktop with watery highlights. |
-| Pixel Sorting Anomaly | Narrow ribbons rearrange image pixels by color channel. |
+| Pixel Sorting Anomaly | 24 large overlapping color-channel-sorted bands smear the desktop into torn, displaced scanlines; four bands reshuffle every 50 ms. |
 | Neon Fractal Invasion | Slowly rotating neon Julia-set fractal contours cover the desktop. |
 | Ghost Cursor Swarm | Ghost cursors follow the mouse's recent path in a spreading comet trail. |
 | Spatial Portal Network | Paired blue and orange portals show the desktop at each other's locations. |
 | CRT Failure Simulator | Simulates an old failing display with scanlines, interference and horizontal jitter. |
 | Voxel Desktop Explosion | Desktop fragments become extruded blocks with shaded sides, a new random blast direction and randomized fragment paths each loop. |
-| Matrix Reconstruction | Green glyph streams fall independently with bright leading characters. |
 | RGB Spectral Phantoms | Separates and shifts the desktop's red, green and blue channels. |
 | Kaleidoscopic Reality | Mirrors the desktop into six rotating kaleidoscope sectors. |
 | Gravity Paint | Thin paint drips leave winding trails that remain while the effect is enabled. |
@@ -30,18 +28,13 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Infinite Desktop City | Flies down a night-time avenue between desktop-textured skyscrapers, with luminous window grids, street reflections and distance fog. |
 | Desktop Planet | Wraps the desktop around a rotating globe with atmospheric glow and a tilted, textured ring that passes in front and behind. |
 | Mobius Reality Ribbon | Folds the desktop into a rotating, half-twisted 3D ribbon with scrolling textures, contrasting faces and luminous edges. |
-| Geometric Implosion | Nested polygon patterns converge inward. |
-| X-Ray Scanner | A moving inspection pane reveals image edges and inverted colors. |
-| Screen Peel & Fold | Peels a diagonal screen corner back with a curled underside and shadow. |
-| Holographic Glitch Objects | Projected wireframe solids appear with offset ghost edges. |
-| Synesthesia Storm | Animated radial spectrum, peak markers and scope traces; not actual audio analysis. |
 | Reality Collapse Finale | Compresses the screen vertically and horizontally, then reopens it with an afterglow. |
 | Rotate Screen | Continuously rotates the captured desktop image around its center. |
 | Random Status Icons | Places warning, success, information and error icons at random positions and sizes. |
 | Melting Screen | Stretches the desktop downward in uneven folds, then fades in a fresh image for the next melt. |
 | Infinite Tunnel | Repeated shrinking desktop copies, including the visible cursor, form a continuous rectangular tunnel. |
 | XOR Color Chaos | Animated XOR patterns mix the desktop's colors into moving geometric interference. |
-| Screen Color Inversion | Inverts every desktop color while enabled, without changing display settings. |
+| Screen Color Inversion | Alternates inverted and normal desktop colors every 500 ms, starting inverted; full-screen flashing without display-setting changes. |
 | Popup Cascade | 24 simulated system messages with OS-aware XP, Vista/7, Windows 10 or Windows 11 styling, system fonts, DPI-scaled layouts and status icons; no real dialogs open. |
 | Random Square Paint | Continuously paints random squares, including previously painted ones, until the screen is covered and beyond. |
 | Chaos Shader | Warps the incoming image beneath animated, full-screen color interference. |

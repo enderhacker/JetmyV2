@@ -131,7 +131,6 @@ struct PayloadRecord {
 };
 const std::vector<PayloadRecord>& Registry();
 
-void EffectPixelFireworks(float, float);
 void EffectChaosRectangles(float, float);
 void EffectBlackHoleSingularities(float, float);
 void EffectDesktopGlassShatter(float, float);
@@ -144,7 +143,6 @@ void EffectGhostCursorSwarm(float, float);
 void EffectSpatialPortalNetwork(float, float);
 void EffectCRTFailureSimulator(float, float);
 void EffectVoxelDesktopExplosion(float, float);
-void EffectMatrixReconstruction(float, float);
 void EffectRGBSpectralPhantoms(float, float);
 void EffectKaleidoscopicReality(float, float);
 void EffectGravityPaint(float, float);
@@ -153,11 +151,6 @@ void Effect3DWarpTunnel(float, float);
 void EffectInfiniteDesktopCity(float, float);
 void EffectDesktopPlanet(float, float);
 void EffectMobiusRealityRibbon(float, float);
-void EffectGeometricImplosion(float, float);
-void EffectXRayScanner(float, float);
-void EffectScreenPeelAndFold(float, float);
-void EffectHolographicGlitch(float, float);
-void EffectSynesthesiaStorm(float, float);
 void EffectRealityCollapseFinale(float, float);
 void EffectRotateScreen(float, float);
 void EffectRandomStatusIcons(float, float);

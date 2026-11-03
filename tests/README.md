@@ -19,3 +19,7 @@ bounded output, isolated clip state, non-silent ten-second PCM loops and bounded
 checks cover bytebeat formula/shift boundaries and the 25 Hz strobe gate. No overlay is
 shown and no audio is played. Entropy Handshake still reads its seed pixels.
 These checks do not replace visual inspection or listening at low volume.
+
+Visual checks also cover Pixel Sorting Anomaly's guard pixels, seeded restarts,
+large-band coverage and dimensions beyond its 2048-pixel sort cap, plus Color
+Inversion's 500 ms boundaries using freshly restored input on every frame.

@@ -3,32 +3,47 @@
 
 namespace VisualPayloads {
 void EffectPixelSortingAnomaly(float time, float dt) {
-    struct Band { int x, y, w, h, channel; bool reverse; };
-    static std::array<Band, 9> bands{};
-    static float tick = 1;
-    static bool initialized = false;
+    struct Band { int x, y, w, h, channel, slip; bool reverse; };
+    static std::array<Band, 24> bands{};
+    static std::vector<uint32_t> sorted;
+    static float tick = 0;
+    static int width = 0, height = 0;
     static size_t next = 0;
-    if (time == 0) { initialized = false; tick = 1; next = 0; }
+    const int w = g_ScreenWidth, h = g_ScreenHeight;
+    if (w <= 0 || h <= 0) return;
     auto create = [](Band& b) {
-        b.w = std::min(g_ScreenWidth, FastRandInt(90, 360));
-        b.h = std::min(g_ScreenHeight, FastRandInt(5, 18));
+        // Large overlapping blocks, but cap each sort even on very wide displays.
+        int limit = std::min(g_ScreenWidth, 2048);
+        b.w = FastRandInt(std::max(1, limit / 3), limit);
+        b.h = FastRandInt(std::max(1, g_ScreenHeight / 24), std::max(1, g_ScreenHeight / 8));
         b.x = FastRandInt(0, g_ScreenWidth - b.w); b.y = FastRandInt(0, g_ScreenHeight - b.h);
         b.channel = FastRandInt(0, 2) * 8; b.reverse = FastRandInt(0, 1) != 0;
+        b.slip = FastRandInt(1, std::max(1, b.w / 4));
     };
-    if (!initialized) { for (auto& band : bands) create(band); initialized = true; }
-    tick += dt;
-    if (tick >= 0.2f) { tick = 0; create(bands[next++ % bands.size()]); }
-    // Sort one representative scanline per band, then copy it. Work is capped
-    // at nine sorts of <=360 elements, rather than sorting every screen row.
+    if (time == 0 || width != w || height != h) {
+        width = w; height = h; tick = 0; next = 0;
+        sorted.resize(std::min(w, 2048));
+        for (auto& band : bands) create(band);
+    }
+    tick += std::clamp(dt, 0.0f, 0.1f);
+    while (tick >= 0.05f) {
+        tick -= 0.05f;
+        for (int i = 0; i < 4; ++i) create(bands[next++ % bands.size()]);
+    }
+    // Sort one scanline per band, then smear it with alternating torn offsets.
+    // All reads for a band finish before writing it; overlapping bands compound.
     for (const auto& b : bands) {
-        auto* row = g_pFramePixels + static_cast<size_t>(b.y) * g_ScreenWidth + b.x;
-        std::sort(row, row + b.w, [&b](uint32_t a, uint32_t c) {
+        const auto* source = g_pFramePixels + static_cast<size_t>(b.y) * w + b.x;
+        std::copy_n(source, b.w, sorted.begin());
+        std::sort(sorted.begin(), sorted.begin() + b.w, [&b](uint32_t a, uint32_t c) {
             unsigned av = (a >> b.channel) & 255, cv = (c >> b.channel) & 255;
             return b.reverse ? av > cv : av < cv;
         });
-        for (int y = 1; y < b.h; ++y)
-            memcpy(row + static_cast<size_t>(y) * g_ScreenWidth, row, b.w * sizeof(uint32_t));
-        Fill(b.x, b.y, 2, b.h, 0xFFE3B0);
+        for (int y = 0; y < b.h; ++y) {
+            auto* row = g_pFramePixels + static_cast<size_t>(b.y + y) * w + b.x;
+            int offset = ((y / 3) & 1) ? b.slip : b.w - b.slip;
+            for (int x = 0; x < b.w; ++x) row[x] = sorted[(x + offset) % b.w];
+        }
     }
 }
 }

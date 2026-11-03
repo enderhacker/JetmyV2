@@ -10,7 +10,7 @@
 
 int main() {
     using namespace VisualPayloads;
-    assert(Registry().size() == 41);
+    assert(Registry().size() == 34);
     assert(SoundPayloads::Registry().size() == 18);
     // Guard pixels exercise odd, tiny and ordinary frame sizes without displaying effects.
     for (auto dimensions : {std::pair<int, int>{1, 1}, {3, 5}, {127, 73}}) {
@@ -36,6 +36,46 @@ int main() {
         assert(std::equal(frame.begin() + 1, frame.end() - 1, source.begin() + 1));
         EffectBitPlaneTopography(0, 0);
         for (size_t i = 1; i <= count; ++i) assert(frame[i] == 0 || frame[i] == 0x00FFFFFFu);
+        for (float time : {0.0f, 0.499f, 0.5f, 0.999f, 1.0f, 1.499f, 1.5f, 60.0f}) {
+            frame = source; // The runtime supplies fresh incoming pixels, never the previous inversion.
+            g_pFramePixels = frame.data() + 1;
+            EffectScreenColorInversion(time, 0);
+            bool inverted = fmodf(time, 1.0f) < 0.5f;
+            for (size_t i = 1; i <= count; ++i)
+                assert(frame[i] == (source[i] ^ (inverted ? 0x00FFFFFFu : 0u)));
+            assert(frame.front() == 0xDEADBEEFu && frame.back() == 0xDEADBEEFu);
+        }
+    }
+    for (auto dimensions : {std::pair<int, int>{1, 1}, {3, 5}, {127, 73}, {2053, 7}, {7, 2053}}) {
+        g_ScreenWidth = dimensions.first; g_ScreenHeight = dimensions.second;
+        size_t count = static_cast<size_t>(g_ScreenWidth) * g_ScreenHeight;
+        std::vector<uint32_t> source(count + 2, 0xDEADBEEFu), frame;
+        for (size_t i = 1; i <= count; ++i) source[i] = static_cast<uint32_t>(i * 123457u) & 0x00FFFFFFu;
+        const auto untouched = source;
+        g_pScratchPixels = source.data() + 1;
+        for (int i = 0; i < 150; ++i) {
+            frame = source;
+            g_pFramePixels = frame.data() + 1;
+            EffectPixelSortingAnomaly(i / 20.0f, i ? 0.05f : 0);
+            assert(frame.front() == 0xDEADBEEFu && frame.back() == 0xDEADBEEFu);
+            assert(source == untouched);
+            for (size_t j = 1; j <= count; ++j) assert((frame[j] & 0xFF000000u) == 0);
+        }
+        auto restart = [&]() {
+            frame = source;
+            g_pFramePixels = frame.data() + 1;
+            g_FastState = 12345u;
+            EffectPixelSortingAnomaly(0, 0);
+            return frame;
+        };
+        auto first = restart();
+        EffectPixelSortingAnomaly(2.0f, 0.1f);
+        assert(restart() == first);
+        if (dimensions == std::pair<int, int>{127, 73}) {
+            size_t changed = 0;
+            for (size_t i = 1; i <= count; ++i) changed += first[i] != source[i];
+            assert(changed > count / 4); // Substantial corruption, not the old tiny ribbons.
+        }
     }
     std::mt19937 random(12345);
     std::set<std::string> names;

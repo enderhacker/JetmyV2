@@ -10,7 +10,6 @@ uint32_t g_FastState = 0x8A5CD791;
 
 const std::vector<PayloadRecord>& Registry() {
     static const std::vector<PayloadRecord> payloads = {
-        { "Pixel Fireworks", EffectPixelFireworks, false },
         { "Chaos Rectangles", EffectChaosRectangles, false },
         { "Black Hole Singularities", EffectBlackHoleSingularities },
         { "Desktop Glass Shatter", EffectDesktopGlassShatter, true, true },
@@ -23,7 +22,6 @@ const std::vector<PayloadRecord>& Registry() {
         { "Spatial Portal Network", EffectSpatialPortalNetwork },
         { "CRT Failure Simulator", EffectCRTFailureSimulator },
         { "Voxel Desktop Explosion", EffectVoxelDesktopExplosion, true, true },
-        { "Matrix Reconstruction", EffectMatrixReconstruction, false },
         { "RGB Spectral Phantoms", EffectRGBSpectralPhantoms },
         { "Kaleidoscopic Reality", EffectKaleidoscopicReality },
         { "Gravity Paint", EffectGravityPaint, false },
@@ -32,11 +30,6 @@ const std::vector<PayloadRecord>& Registry() {
         { "Infinite Desktop City", EffectInfiniteDesktopCity },
         { "Desktop Planet", EffectDesktopPlanet },
         { "Mobius Reality Ribbon", EffectMobiusRealityRibbon },
-        { "Geometric Implosion", EffectGeometricImplosion, false },
-        { "X-Ray Scanner", EffectXRayScanner },
-        { "Screen Peel & Fold", EffectScreenPeelAndFold },
-        { "Holographic Glitch Objects", EffectHolographicGlitch, false },
-        { "Synesthesia Storm", EffectSynesthesiaStorm, false },
         { "Reality Collapse Finale", EffectRealityCollapseFinale, true, true },
         { "Rotate Screen", EffectRotateScreen },
         { "Random Status Icons", EffectRandomStatusIcons, false },

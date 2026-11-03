@@ -5,7 +5,7 @@ appearance of a chaotic desktop with screen distortions, animations, simulated
 system messages, and synthesized audio. It is a visual demo, not a tool that
 infects or damages your computer.
 
-The project includes **41 visual effects**, **18 sound payloads**, and a separate
+The project includes **34 visual effects**, **18 sound payloads**, and a separate
 **10-second simulated blue-screen finale**. You can run an automatic show or use
 the manual control panel to preview effects independently.
 
@@ -120,9 +120,8 @@ Launch with `--menu` to open a native Windows control panel. All payloads start
 - Click a visual's button to turn it on; click again to turn it off.
 - Enable just one to inspect it, or enable several to combine their output.
 - Re-enabling an effect restarts its animation state.
-- Fireworks, digital infection, neon patterns, Matrix, holograms, the spectrum,
-  and geometric implosion draw over the incoming image. Fireworks leave fading
-  trails; infection filaments remain until the effect is restarted.
+- Digital infection, paint, icons, and simulated popups draw over the incoming
+  image. Infection filaments remain until the effect is restarted.
   Shatter, voxel explosion, and Reality Collapse preserve the
   incoming image as their texture, with black space around the moving pieces.
   A black-backed effect covers earlier layers; effects drawn afterward can still
@@ -165,16 +164,17 @@ and is disabled when nothing is active.
 
 ## Visual and sound payloads
 
-See **[payloads.md](payloads.md)** for the complete list of all **60 payloads**
-and a short description of each: 41 normal visuals, 18 sounds, and one finale.
+See **[payloads.md](payloads.md)** for the complete list of all **53 payloads**
+and a short description of each: 34 normal visuals, 18 sounds, and one finale.
 
 Visuals include desktop warping, rotation, recursive tunnels, glass shattering,
-melting, persistent paint trails, particles, fractals, status icons, and simulated
+melting, persistent paint trails, pixel sorting, fractals, status icons, and simulated
 popups. Their names describe visual effects, not actual changes to Windows.
 For example, Rotate Screen transforms the captured image rather than changing
 display settings; Popup Cascade's messages do not report actual system problems.
-Synesthesia Storm's spectrum is procedural, not microphone input or live audio
-analysis.
+Pixel Sorting Anomaly smears large overlapping sorted bands with displaced scanlines
+and rapid reshuffling. Screen Color Inversion alternates inverted and normal output
+every 500 ms, starting inverted; this produces full-screen flashing.
 
 Seismic Slice & Drift adds counter-phase raster shearing; Recursive ROP Crucible
 keeps its own previous overlay frame for expanding XOR/difference feedback;
