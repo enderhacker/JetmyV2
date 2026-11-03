@@ -5,7 +5,7 @@ appearance of a chaotic desktop with screen distortions, animations, simulated
 system messages, and synthesized audio. It is a visual demo, not a tool that
 infects or damages your computer.
 
-The project includes **38 visual effects**, **15 sound payloads**, and a separate
+The project includes **41 visual effects**, **18 sound payloads**, and a separate
 **10-second simulated blue-screen finale**. You can run an automatic show or use
 the manual control panel to preview effects independently.
 
@@ -128,7 +128,8 @@ Launch with `--menu` to open a native Windows control panel. All payloads start
   A black-backed effect covers earlier layers; effects drawn afterward can still
   appear on top. Ordinary desktop distortions keep their image backgrounds.
 - Turning off every visual hides the effects overlay. The idle/audio-only menu
-  does not capture or render the desktop.
+  does not capture or render desktop frames. Entropy Handshake reads a few desktop
+  pixels once when its audio loop is generated, solely to seed its noise.
 - The panel stays clear of the visual overlay so its controls remain usable.
 
 ### Audio controls
@@ -164,8 +165,8 @@ and is disabled when nothing is active.
 
 ## Visual and sound payloads
 
-See **[payloads.md](payloads.md)** for the complete list of all **54 payloads**
-and a short description of each: 38 normal visuals, 15 sounds, and one finale.
+See **[payloads.md](payloads.md)** for the complete list of all **60 payloads**
+and a short description of each: 41 normal visuals, 18 sounds, and one finale.
 
 Visuals include desktop warping, rotation, recursive tunnels, glass shattering,
 melting, persistent paint trails, particles, fractals, status icons, and simulated
@@ -174,6 +175,11 @@ For example, Rotate Screen transforms the captured image rather than changing
 display settings; Popup Cascade's messages do not report actual system problems.
 Synesthesia Storm's spectrum is procedural, not microphone input or live audio
 analysis.
+
+Seismic Slice & Drift adds counter-phase raster shearing; Recursive ROP Crucible
+keeps its own previous overlay frame for expanding XOR/difference feedback;
+Bit-Plane Topography cycles binary luminance contours with brief visible inversions.
+These effects contain particularly strong motion and flashing.
 
 The sound collection mixes bytebeat textures, percussion, ambient soundscapes,
 and six original arranged chiptune-style songs:
@@ -191,6 +197,11 @@ stream handles playback, and selection changes crossfade over approximately
 50 milliseconds. Signal filtering and bounded sample amplitude reduce harsh
 edges, but listening volume still depends on your Windows and speaker settings.
 Some payloads, such as Random Chirps, contain intentional pauses within the sound.
+Bytebeat Industrial Scream and Entropy Handshake deliberately use abrasive noise
+and carrier bursts; Shepard-Risset Descent layers octave-spaced falling tones over
+a low transformer hum. They retain the same bounded output and crossfades as other
+sounds. Entropy Handshake discards sampled pixel values immediately after mixing
+them into its local LFSR seed; it does not save or transmit desktop images.
 
 ## Blue-screen finale
 

@@ -1,6 +1,6 @@
 # Payloads
 
-All 54 payloads: 38 visual effects, one finale and 15 sounds. Use `JetmyV2.exe --menu`
+All 60 payloads: 41 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -46,6 +46,9 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Random Square Paint | Continuously paints random squares, including previously painted ones, until the screen is covered and beyond. |
 | Chaos Shader | Warps the incoming image beneath animated, full-screen color interference. |
 | Hell Shader | Rapidly flashing, full-screen vortex distortion and intense shifting colors. |
+| Seismic Slice & Drift | Alternating 2–8-pixel horizontal strips shear in counter-phase; two-pixel vertical columns join halfway through each cycle to form a shredded woven grid. |
+| Recursive ROP Crucible | Expands its previous overlay frame by approximately 101–102% per nominal frame, combining XOR and brightened difference feedback with a periodic desktop-refresh sweep. |
+| Bit-Plane Topography | Cycles luminance bit-planes from bit 7 to bit 0 as monochrome and neon binary contours, with brief frame-visible inverted flashes. |
 
 ## Finale
 
@@ -83,3 +86,10 @@ page. The Windows 11 preset intentionally does not use its newer black design.
 | Glass Bells | Pitched bells with independently decaying overtones. |
 | Rain on Metal | Filtered rainfall mixed with random metallic droplets. |
 | Cosmic Drone | Slowly swelling harmonies with soft, breath-like noise. |
+| Bytebeat Industrial Scream | Abrasive recursive-shift bytebeat, syncopated clock dividers and ring-modulated, bit-crushed sawtooth sweeps. |
+| Shepard-Risset Descent | Ten octave-spaced, continuously descending sine voices with bell-shaped loudness weighting over a grinding 50 Hz transformer hum. |
+| Entropy Handshake | Desktop-pixel-seeded LFSR bursts alternate high-pass and band-pass noise with collision clicks and sharp carrier bursts; uses 3 kHz rather than a 4 kHz Nyquist-limit carrier in the 8 kHz stream. |
+
+The new visuals contain intense motion and flashing; Industrial Scream and Entropy
+Handshake are intentionally harsh. Start with low system volume. Audio remains
+amplitude-bounded, and the existing emergency shortcuts stop all effects.

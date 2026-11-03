@@ -21,9 +21,17 @@ exit /b %EXIT_CODE%
 #>
 
 # ==============================================================================
-# PowerShell Engine
+# PowerShell Engine & Build Stopwatch
 # ==============================================================================
 $ErrorActionPreference = "Stop"
+$BuildTimer = [System.Diagnostics.Stopwatch]::StartNew()
+
+function Format-Elapsed([TimeSpan]$ts) {
+    if ($ts.TotalMinutes -ge 1) {
+        return "{0}m {1:D2}.{2:D2}s" -f [int]$ts.TotalMinutes, $ts.Seconds, [int]($ts.Milliseconds / 10)
+    }
+    return "{0:F2}s" -f $ts.TotalSeconds
+}
 
 $Target = "JetmyV2.exe"
 $SourcePatterns = @(
@@ -72,7 +80,7 @@ $running = Get-Process -Name $procName -ErrorAction SilentlyContinue
 if ($running) {
     Write-Host "[*] Terminating running $Target instance..." -ForegroundColor Yellow
     $running | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 250
+    Start-Sleep -Milliseconds 200
 }
 
 if (Test-Path $Target) {
@@ -101,7 +109,9 @@ foreach ($pattern in $SourcePatterns) {
     if ($files) {
         foreach ($file in $files) {
             $rel = Resolve-Path -Path $file.FullName -Relative
-            $Sources.Add($rel)
+            if (-not $Sources.Contains($rel)) {
+                $Sources.Add($rel)
+            }
         }
     }
 }
@@ -114,7 +124,6 @@ $rootDir = Split-Path -Parent $binDir
 $env:PATH = "$binDir;" + $env:PATH
 $resObj = "resources.o"
 
-# If the compiler path contains spaces, disable default-manifest.o so ld doesn't choke
 if ($gppPath -match ' ') {
     $manifestFiles = Get-ChildItem -Path $rootDir -Filter "default-manifest.o" -Recurse -File -ErrorAction SilentlyContinue
     foreach ($mFile in $manifestFiles) {
@@ -127,7 +136,7 @@ if ($gppPath -match ' ') {
 
 try {
     # --------------------------------------------------------------------------
-    # 5. Compile Resource File (.rc) if Present (version.rc or resources.rc)
+    # 5. Compile Resource File (.rc) if Present
     # --------------------------------------------------------------------------
     $rcFile = $null
     if (Test-Path "version.rc") {
@@ -150,7 +159,7 @@ try {
     }
 
     # --------------------------------------------------------------------------
-    # 6. Target Architecture & OS Subsystem Detection
+    # 6. Target Architecture & Multithread Detection
     # --------------------------------------------------------------------------
     $machine = & $gppPath -dumpmachine
     if ($machine -match "x86_64") {
@@ -162,7 +171,7 @@ try {
     # --------------------------------------------------------------------------
     # 7. Compile Main Project
     # --------------------------------------------------------------------------
-    Write-Host "[*] Compiling main.cpp -> $Target..." -ForegroundColor Cyan
+    Write-Host "[*] Compiling $($Sources.Count) source(s) -> $Target..." -ForegroundColor Cyan
 
     $CompilerArgs = @(
         # Source & Resource files
@@ -181,18 +190,18 @@ try {
         "-Wextra"
         "-Wno-unused-parameter"
 
-        # === SPEED OPTIMIZATION ===
+        # === SPEED & MULTITHREADED OPTIMIZATION ===
         "-O3"
         "-ffast-math"
         "-funroll-loops"
         "-mtune=generic"
+        "-flto=auto"            # <--- Eliminates the serial LTRANS warning, compiles across all CPU cores
 
         # === ANTI-DECOMPILATION & STRIPPING ===
         "-s"
         "-fno-ident"
         "-fno-rtti"
         "-fomit-frame-pointer"
-        "-flto"
         "-Wl,--build-id=none"
         "-ffunction-sections"
         "-fdata-sections"
@@ -220,16 +229,20 @@ try {
     $compExitCode = $LASTEXITCODE
 
     if ($compExitCode -ne 0) {
+        $BuildTimer.Stop()
         Write-Host ""
-        Write-Host "[!] ERROR: Compilation failed with exit code $compExitCode." -ForegroundColor Red
+        Write-Host "[!] ERROR: Compilation failed with exit code $compExitCode after $(Format-Elapsed $BuildTimer.Elapsed)." -ForegroundColor Red
         exit $compExitCode
     }
 
     # --------------------------------------------------------------------------
-    # 8. Success Output
+    # 8. Success Output with Elapsed Time
     # --------------------------------------------------------------------------
+    $BuildTimer.Stop()
+    $elapsedStr = Format-Elapsed $BuildTimer.Elapsed
+
     Write-Host ""
-    Write-Host "[+] Build successful!" -ForegroundColor Green
+    Write-Host "[+] Build successful in $elapsedStr!" -ForegroundColor Green
     $fileInfo = Get-Item $Target
     $sizeKb = [Math]::Round($fileInfo.Length / 1KB, 2)
     Write-Host "[+] Output : $($fileInfo.FullName)" -ForegroundColor Gray

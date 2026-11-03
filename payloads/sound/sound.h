@@ -27,6 +27,7 @@ struct Voice {
     std::array<uint32_t, 8> songPhase{}, songIncrement{};
     std::array<int, 8> songNote{};
     std::array<float, 4> memory{};
+    std::array<float, 10> descentPhase{};
     float Noise() {
         noiseState ^= noiseState << 13;
         noiseState ^= noiseState >> 17;
@@ -53,6 +54,9 @@ float SonarSoundscape(uint32_t, Voice&);
 float GlassBells(uint32_t, Voice&);
 float RainOnMetal(uint32_t, Voice&);
 float CosmicDrone(uint32_t, Voice&);
+float BytebeatIndustrialScream(uint32_t, Voice&);
+float ShepardRissetDescent(uint32_t, Voice&);
+float EntropyHandshake(uint32_t, Voice&);
 std::vector<int16_t> Synthesize(Generator generator, unsigned seconds, std::mt19937& random, bool loop = false);
 
 // A single continuously queued output stream; selection changes crossfade inside it.

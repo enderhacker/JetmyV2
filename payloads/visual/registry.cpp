@@ -47,7 +47,10 @@ const std::vector<PayloadRecord>& Registry() {
         { "Popup Cascade", EffectPopupCascade, false },
         { "Random Square Paint", EffectRandomSquarePaint, false },
         { "Chaos Shader", EffectChaosShader },
-        { "Hell Shader", EffectHellShader }
+        { "Hell Shader", EffectHellShader },
+        { "Seismic Slice & Drift", EffectSeismicSliceAndDrift },
+        { "Recursive ROP Crucible", EffectRecursiveRopCrucible },
+        { "Bit-Plane Topography", EffectBitPlaneTopography }
     };
     return payloads;
 }

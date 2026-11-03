@@ -169,5 +169,8 @@ void EffectPopupCascade(float, float);
 void EffectRandomSquarePaint(float, float);
 void EffectChaosShader(float, float);
 void EffectHellShader(float, float);
+void EffectSeismicSliceAndDrift(float, float);
+void EffectRecursiveRopCrucible(float, float);
+void EffectBitPlaneTopography(float, float);
 
 } // namespace VisualPayloads

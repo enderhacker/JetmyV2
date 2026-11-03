@@ -17,7 +17,10 @@ const std::vector<PayloadRecord>& Registry() {
         {"Sonar Soundscape", SonarSoundscape},
         {"Glass Bells", GlassBells},
         {"Rain on Metal", RainOnMetal},
-        {"Cosmic Drone", CosmicDrone}
+        {"Cosmic Drone", CosmicDrone},
+        {"Bytebeat Industrial Scream", BytebeatIndustrialScream},
+        {"Shepard-Risset Descent", ShepardRissetDescent},
+        {"Entropy Handshake", EntropyHandshake}
     };
     return payloads;
 }
