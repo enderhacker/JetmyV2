@@ -167,5 +167,6 @@ void EffectScreenColorInversion(float, float);
 void EffectPopupCascade(float, float);
 void EffectRandomSquarePaint(float, float);
 void EffectChaosShader(float, float);
+void EffectHellShader(float, float);
 
 } // namespace VisualPayloads

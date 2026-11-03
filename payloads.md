@@ -1,6 +1,6 @@
 # Payloads
 
-All 53 payloads: 37 visual effects, one finale and 15 sounds. Use `JetmyV2.exe --menu`
+All 54 payloads: 38 visual effects, one finale and 15 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -43,8 +43,9 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | XOR Color Chaos | Animated XOR patterns mix the desktop's colors into moving geometric interference. |
 | Screen Color Inversion | Inverts every desktop color while enabled, without changing display settings. |
 | Popup Cascade | 24 simulated system messages with OS-aware XP, Vista/7, Windows 10 or Windows 11 styling, system fonts, DPI-scaled layouts and status icons; no real dialogs open. |
-| Random Square Paint | Paints one randomly colored square at a time until the entire screen is covered. |
+| Random Square Paint | Continuously paints random squares, including previously painted ones, until the screen is covered and beyond. |
 | Chaos Shader | Warps the incoming image beneath animated, full-screen color interference. |
+| Hell Shader | Rapidly flashing, full-screen vortex distortion and intense shifting colors. |
 
 ## Finale
 
