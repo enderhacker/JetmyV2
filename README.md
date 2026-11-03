@@ -181,26 +181,23 @@ keeps its own previous overlay frame for expanding XOR/difference feedback;
 Bit-Plane Topography cycles binary luminance contours with brief visible inversions.
 These effects contain particularly strong motion and flashing.
 
-The sound collection mixes bytebeat textures, percussion, ambient soundscapes,
-and six original arranged chiptune-style songs:
-
-- **Bytebeat Neon Drive:** synthwave-inspired lead, bass, arpeggios, and drums.
-- **Bytebeat Pocket Groove:** a swung pentatonic groove.
-- **Bytebeat Crystal Waltz:** a music-box-style waltz.
-- **Bytebeat Arcade Quest:** a major-key game-theme arrangement.
-- **Bytebeat Midnight Keys:** mellow electric-piano-style jazz voicings.
-- **Bytebeat Dusk Breaks:** acid-style bass and syncopated breakbeats.
+The 18 sounds are deliberately abrasive glitch/noise simulations: bytebeat
+fractures, buffer-freeze stutters, corrupted alarms, bit-depth collapse, modem
+hash, PC-speaker storms, feedback howl, accelerating crackles and a rising
+Shepard sawtooth bank. Industrial Scream and Entropy Handshake are retained;
+the former melodic/ambient collection and Shepard-Risset Descent are replaced.
+See [payloads.md](payloads.md#sound-payloads) for the complete list.
 
 Sounds are synthesized locally rather than played from song recordings. Normal
 clips use ten-second loops with smoothed boundaries. A continuously queued WinMM
 stream handles playback, and selection changes crossfade over approximately
 50 milliseconds. Signal filtering and bounded sample amplitude reduce harsh
 edges, but listening volume still depends on your Windows and speaker settings.
-Some payloads, such as Random Chirps, contain intentional pauses within the sound.
-Bytebeat Industrial Scream and Entropy Handshake deliberately use abrasive noise
-and carrier bursts; Shepard-Risset Descent layers octave-spaced falling tones over
-a low transformer hum. They retain the same bounded output and crossfades as other
-sounds. Entropy Handshake discards sampled pixel values immediately after mixing
+Clipping, aliasing, buffer starvation and register patterns are synthesized effects,
+not actual device failures or reads of CPU/process memory. The stream remains
+8 kHz mono: modem sounds are stylized, and comb resonances sweep approximately
+1–3.6 kHz, not the upper human hearing range. Bounded PCM does not guarantee safe
+listening volume; start low. Entropy Handshake discards sampled pixel values immediately after mixing
 them into its local LFSR seed; it does not save or transmit desktop images.
 
 ## Blue-screen finale
@@ -328,7 +325,7 @@ like a normal local Windows desktop.
 | `runtime/finale.cpp` | Ten-second presentation lifecycle, steady error tone, input handling, and emergency exits. |
 | `runtime/blue_screen.cpp` | Version detection, classic/modern crash-screen artwork, typography, and QR generation. |
 | `payloads/visual/` | Individual visual implementations, rendering helpers, registry, and popup styling. |
-| `payloads/sound/` | Sound generators, musical helpers, registry, loop synthesis, and streaming player. |
+| `payloads/sound/` | Sound generators, synthesis helpers, registry, loop synthesis, and streaming player. |
 | `payloads.md` | Complete payload catalog with quick summaries. |
 | `compile.cmd` | Modular release build script. |
 

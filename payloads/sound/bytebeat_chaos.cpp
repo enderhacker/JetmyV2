@@ -1,0 +1,29 @@
+#include "chaos.h"
+
+namespace SoundPayloads {
+float BytebeatXenonTear(uint32_t t, Voice&) {
+    return Chaos::Byte((t * ((t >> 5) | (t >> 8))) ^ (t >> 16));
+}
+
+float BytebeatAcidFracture(uint32_t t, Voice&) {
+    return Chaos::Byte((t * 5u & t >> 7) | (t * 3u & t >> 10) |
+        (t * (((t >> 12) | (t >> 8)) & 63u & (t >> 4))));
+}
+
+float BytebeatVoidEngine(uint32_t t, Voice&) {
+    // Explicit modulo-32 shift count: the literal formula otherwise has undefined shifts.
+    return Chaos::Byte(((t >> 6) | t | (t >> ((t >> 16) & 31u))) * 10u + ((t >> 11) & 7u));
+}
+
+float MemoryBusGlitch(uint32_t t, Voice& voice) {
+    // Synthetic register patterns only: never read process memory or hardware registers.
+    uint32_t address = t * 1664525u + 1013904223u;
+    uint32_t lane = (t / 1600u) & 3u;
+    uint32_t data = lane == 0 ? ((t * 13u) ^ (t >> 3)) :
+        lane == 1 ? ((address >> ((t >> 9) & 15u)) ^ t) :
+        lane == 2 ? ((t << 3) | (t >> 5)) : ((t * ((t >> 8) & 31u)) ^ (address >> 24));
+    float carrier = Chaos::Square(Chaos::Advance(voice.phase, 700 + float((t >> 7) & 15u) * 170));
+    float packet = t % 800u < 640u ? 1.0f : 0.08f;
+    return packet * (0.7f * Chaos::Byte(data) + 0.3f * carrier);
+}
+} // namespace SoundPayloads

@@ -12,7 +12,10 @@ if ($LASTEXITCODE -eq 0) { & $output }
 ```
 
 Assertions must remain enabled (do not pass `-DNDEBUG`). Tests check registry
-counts, tiny/odd frame boundaries, restart behavior, initial monochrome masks,
-finite audio synthesis and bounded, non-silent ten-second loops. No overlay is
+counts, tiny/odd frame boundaries, restart behavior and initial monochrome masks
+for the three newest visuals; all 18 sound generators are checked for finite,
+bounded output, isolated clip state, non-silent ten-second PCM loops and bounded
+120-second maximum-length clips. Additional
+checks cover bytebeat formula/shift boundaries and the 25 Hz strobe gate. No overlay is
 shown and no audio is played. Entropy Handshake still reads its seed pixels.
 These checks do not replace visual inspection or listening at low volume.

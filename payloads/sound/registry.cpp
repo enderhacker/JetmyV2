@@ -3,24 +3,24 @@
 namespace SoundPayloads {
 const std::vector<PayloadRecord>& Registry() {
     static const std::vector<PayloadRecord> payloads = {
-        {"Bytebeat Pulse", BytebeatPulse},
-        {"Bytebeat Melody", BytebeatMelody},
-        {"Bytebeat Arpeggio", BytebeatArpeggio},
-        {"Random Chirps", RandomChirps},
-        {"Noise Percussion", NoisePercussion},
-        {"Bytebeat Neon Drive", BytebeatNeonDrive},
-        {"Bytebeat Pocket Groove", BytebeatPocketGroove},
-        {"Bytebeat Crystal Waltz", BytebeatCrystalWaltz},
-        {"Bytebeat Arcade Quest", BytebeatArcadeQuest},
-        {"Bytebeat Midnight Keys", BytebeatMidnightKeys},
-        {"Bytebeat Dusk Breaks", BytebeatDuskBreaks},
-        {"Sonar Soundscape", SonarSoundscape},
-        {"Glass Bells", GlassBells},
-        {"Rain on Metal", RainOnMetal},
-        {"Cosmic Drone", CosmicDrone},
         {"Bytebeat Industrial Scream", BytebeatIndustrialScream},
-        {"Shepard-Risset Descent", ShepardRissetDescent},
-        {"Entropy Handshake", EntropyHandshake}
+        {"Entropy Handshake", EntropyHandshake},
+        {"Buffer Freeze Stutter", BufferFreezeStutter},
+        {"Dual-Tone Siren Warp", DualToneSirenWarp},
+        {"Bytebeat Xenon Tear", BytebeatXenonTear},
+        {"Bit-Rot Quantizer", BitRotQuantizer},
+        {"Subharmonic Meltdown", SubharmonicMeltdown},
+        {"Modem Carrier Hell", ModemCarrierHell},
+        {"Bytebeat Acid Fracture", BytebeatAcidFracture},
+        {"PC Speaker Beep Storm", PCSpeakerBeepStorm},
+        {"Square-Wave Strobe", SquareWaveStrobe},
+        {"FM Feedback Howl", FMFeedbackHowl},
+        {"Radiation Avalanche", RadiationAvalanche},
+        {"Shepard Panic Ascent", ShepardPanicAscent},
+        {"Ring-Mod Tritone Clash", RingModTritoneClash},
+        {"Bytebeat Void Engine", BytebeatVoidEngine},
+        {"Memory Bus Glitch", MemoryBusGlitch},
+        {"Comb Filter Screamer", CombFilterScreamer}
     };
     return payloads;
 }

@@ -3,6 +3,9 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <limits>
+#include <set>
+#include <string>
 #include <utility>
 
 int main() {
@@ -35,8 +38,12 @@ int main() {
         for (size_t i = 1; i <= count; ++i) assert(frame[i] == 0 || frame[i] == 0x00FFFFFFu);
     }
     std::mt19937 random(12345);
-    for (auto generator : {SoundPayloads::BytebeatIndustrialScream, SoundPayloads::ShepardRissetDescent,
-                           SoundPayloads::EntropyHandshake}) {
+    std::set<std::string> names;
+    std::set<SoundPayloads::Generator> generators;
+    for (const auto& payload : SoundPayloads::Registry()) {
+        assert(names.insert(payload.name).second);
+        assert(payload.generate && generators.insert(payload.generate).second);
+        auto generator = payload.generate;
         SoundPayloads::Voice voice{random, 12345u};
         for (uint32_t i = 0; i < SoundPayloads::SampleRate * 20; ++i) {
             float value = generator(i, voice);
@@ -50,6 +57,39 @@ int main() {
             peak = std::max(peak, std::abs(int(sample)));
         }
         assert(peak > 100);
+        // Exercise the longest supported clip, including many delay wraps and quantizer cycles.
+        auto longest = SoundPayloads::Synthesize(generator, 120, random, true);
+        assert(longest.size() == SoundPayloads::SampleRate * 120);
+        for (auto sample : longest) assert(sample >= -6000 && sample <= 6000);
+        // Fresh voices must not inherit feedback, delay or oscillator state from other clips.
+        // Desktop-seeded Entropy Handshake intentionally depends on the live desktop.
+        if (generator != SoundPayloads::EntropyHandshake) {
+            std::mt19937 firstRandom(42), secondRandom(42);
+            SoundPayloads::Voice first{firstRandom, 42u}, second{secondRandom, 42u};
+            for (uint32_t i = 0; i < 2000; ++i) {
+                float a = generator(i, first), b = generator(i, second);
+                assert(a == b);
+            }
+        }
+        std::cout << "Checked " << payload.name << '\n';
     }
-    std::cout << "New payload smoke tests passed (no playback or overlay).\n";
+    // Exact unsigned formula semantics, including variable shift counts >= 32.
+    SoundPayloads::Voice formulaVoice{random, 1u};
+    for (uint32_t t : {0u, 1u, 65535u, 65536u, 2097152u, std::numeric_limits<uint32_t>::max()}) {
+        auto byte = [](uint32_t raw) { return float(raw & 255u) / 127.5f - 1.0f; };
+        assert(SoundPayloads::BytebeatXenonTear(t, formulaVoice) == byte((t * ((t >> 5) | (t >> 8))) ^ (t >> 16)));
+        assert(SoundPayloads::BytebeatAcidFracture(t, formulaVoice) == byte(
+            (t * 5u & t >> 7) | (t * 3u & t >> 10) | (t * (((t >> 12) | (t >> 8)) & 63u & (t >> 4)))));
+        assert(SoundPayloads::BytebeatVoidEngine(t, formulaVoice) == byte(
+            ((t >> 6) | t | (t >> ((t >> 16) & 31u))) * 10u + ((t >> 11) & 7u)));
+    }
+    SoundPayloads::Voice strobe{random, 1u};
+    for (uint32_t t = 0; t < SoundPayloads::SampleRate; ++t) {
+        float value = SoundPayloads::SquareWaveStrobe(t, strobe);
+        assert(t % 320u < 160u ? fabsf(value) == 1 : value == 0);
+    }
+    assert(SoundPayloads::Synthesize(nullptr, 10, random).empty());
+    assert(SoundPayloads::Synthesize(SoundPayloads::SquareWaveStrobe, 0, random).empty());
+    assert(SoundPayloads::Synthesize(SoundPayloads::SquareWaveStrobe, 121, random).empty());
+    std::cout << "Payload smoke tests passed (all 18 sounds; no playback or overlay).\n";
 }

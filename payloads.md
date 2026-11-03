@@ -71,25 +71,29 @@ page. The Windows 11 preset intentionally does not use its newer black design.
 
 | Payload | Quick summary |
 | --- | --- |
-| Bytebeat Pulse | Syncopated, bit-crushed pulse bass. |
-| Bytebeat Melody | Warm, plucked pentatonic melody with a bytebeat texture. |
-| Bytebeat Arpeggio | Fast, high-register chiptune arpeggios using two oscillators. |
-| Random Chirps | Random ascending and descending whistles with pauses between them. |
-| Noise Percussion | A sixteen-step kick, snare and noise hi-hat pattern. |
-| Bytebeat Neon Drive | Minor-key synthwave with pulse lead, bass, arpeggios and drums. |
-| Bytebeat Pocket Groove | Swung pentatonic groove with plucked bass and offbeat chords. |
-| Bytebeat Crystal Waltz | Music-box waltz with melody, alternating bass and chords. |
-| Bytebeat Arcade Quest | Major-key game theme with square-wave harmony and percussion. |
-| Bytebeat Midnight Keys | Mellow electric-piano-style jazz chords, melodic fills and brushed noise. |
-| Bytebeat Dusk Breaks | Minor acid-bass sequence with syncopated breakbeats and bright arpeggios. |
-| Sonar Soundscape | Underwater pings and delayed echoes over a low ambient background. |
-| Glass Bells | Pitched bells with independently decaying overtones. |
-| Rain on Metal | Filtered rainfall mixed with random metallic droplets. |
-| Cosmic Drone | Slowly swelling harmonies with soft, breath-like noise. |
 | Bytebeat Industrial Scream | Abrasive recursive-shift bytebeat, syncopated clock dividers and ring-modulated, bit-crushed sawtooth sweeps. |
-| Shepard-Risset Descent | Ten octave-spaced, continuously descending sine voices with bell-shaped loudness weighting over a grinding 50 Hz transformer hum. |
 | Entropy Handshake | Desktop-pixel-seeded LFSR bursts alternate high-pass and band-pass noise with collision clicks and sharp carrier bursts; uses 3 kHz rather than a 4 kHz Nyquist-limit carrier in the 8 kHz stream. |
+| Buffer Freeze Stutter | Loops an approximately 12 ms synthetic buffer fragment with pitch jitter, granular slips and clipped distortion. |
+| Dual-Tone Siren Warp | Out-of-phase square-wave sirens rapidly sweep between 450 Hz and 3.8 kHz. |
+| Bytebeat Xenon Tear | Unsigned shift/multiply/XOR formula fractures into metallic ticks and noise bursts. |
+| Bit-Rot Quantizer | Degrades from 8-bit quantization to single-bit PWM with sample-hold aliasing and offset jumps. |
+| Subharmonic Meltdown | A 32 Hz square bass collides with unstable carriers and rattling difference tones. |
+| Modem Carrier Hell | Stylized, distorted handshake pilots, phase reversals and high-pass demodulation hash; not a V.34 implementation. |
+| Bytebeat Acid Fracture | High-speed bitwise arpeggios fracture across registers with jagged algorithmic rhythms. |
+| PC Speaker Beep Storm | Four independent BIOS-tone square voices collide with parity flips and brief silence gaps. |
+| Square-Wave Strobe | An 800 Hz square wave chopped by a 25 Hz, 50%-duty amplitude gate. |
+| FM Feedback Howl | Two-operator FM with previous-sample feedback alternates screeching and motorboating. |
+| Radiation Avalanche | Poisson-distributed crackles accelerate exponentially into saturated static over each ten-second cycle. |
+| Shepard Panic Ascent | Rising octave-spaced sawtooth bank with increasing pulse tempo and harsh tritone partners. |
+| Ring-Mod Tritone Clash | Hard-clipped waves a tritone apart (frequency ratio sqrt(2)) continuously cross-modulate and ring-modulate. |
+| Bytebeat Void Engine | Grinding unsigned shift/multiply formula produces mechanical chugs and digital squeals; variable shift counts wrap modulo 32. |
+| Memory Bus Glitch | Synthetic register-like patterns become pseudo-PCM squeals and packet bursts; no actual memory/register access. |
+| Comb Filter Screamer | Noise feeds a bounded, swept fractional-delay feedback comb with approximately 1–3.6 kHz fundamental resonances. |
 
-The new visuals contain intense motion and flashing; Industrial Scream and Entropy
-Handshake are intentionally harsh. Start with low system volume. Audio remains
-amplitude-bounded, and the existing emergency shortcuts stop all effects.
+The new visuals contain intense motion and flashing; all sounds are intentionally
+harsh. Start with low system volume. The 8 kHz mono stream cannot reproduce tones
+above its 4 kHz Nyquist limit; aliasing is intentional in the digital effects.
+Generators clip/soft-clip their distortion, and the player preserves filtering,
+bounded PCM (maximum magnitude 6000), loop smoothing and selection crossfades.
+Amplitude limits do not guarantee safe listening levels. Existing emergency
+shortcuts stop all effects; no system volume or audio-driver settings are changed.
