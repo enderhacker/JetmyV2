@@ -10,7 +10,7 @@ namespace {
 constexpr wchar_t MenuClass[] = L"JetmyPayloadControlPanel";
 constexpr wchar_t PaneClass[] = L"JetmyPayloadControlPane";
 constexpr int VisualBase = 1000, AudioBase = 2000, StopAll = 10, Close = 11, Finale = 12, FinaleStyle = 13;
-constexpr int Search = 14, ClearSearch = 15, VisualTab = 16, AudioTab = 17;
+constexpr int VisualTab = 16, AudioTab = 17;
 std::wstring Wide(const char* text) { return std::wstring(text, text + strlen(text)); } // Registry names are ASCII.
 std::wstring Lower(std::wstring text) {
     for (auto& ch : text) ch = static_cast<wchar_t>(std::towlower(ch));
@@ -80,11 +80,6 @@ void ControlPanel::Create() {
     SendMessageW(title_, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont_), FALSE);
     description_ = Add(window_, L"STATIC", L"Combine visuals. Choose one audio loop. Click again to turn off.", SS_LEFT);
     stop_ = Add(window_, L"BUTTON", L"Stop all", BS_OWNERDRAW | WS_TABSTOP, StopAll);
-    searchLabel_ = Add(window_, L"STATIC", L"Search visuals and audio (Ctrl+F)", SS_LEFT);
-    search_ = Add(window_, L"EDIT", std::wstring{}, ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP, Search);
-    SendMessageW(search_, EM_SETLIMITTEXT, 128, 0);
-    SendMessageW(search_, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Search by name (Ctrl+F)"));
-    clear_ = Add(window_, L"BUTTON", L"Clear", BS_OWNERDRAW | WS_TABSTOP, ClearSearch);
     visualsTitle_ = Add(window_, L"STATIC", L"Visual effects", SS_LEFT);
     audioTitle_ = Add(window_, L"STATIC", L"Audio loops", SS_LEFT);
     for (auto heading : {visualsTitle_, audioTitle_})
@@ -103,7 +98,7 @@ void ControlPanel::Create() {
     SendMessageW(finaleStyle_, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), Scale(24));
     status_ = Add(window_, L"STATIC", std::wstring{}, SS_LEFT);
     hint_ = Add(window_, L"STATIC", L"Flashing visuals / audio. Exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.", SS_LEFT);
-    for (auto label : {searchLabel_, visualsHelp_, audioHelp_, finaleLabel_, hint_})
+    for (auto label : {visualsHelp_, audioHelp_, finaleLabel_, hint_})
         SendMessageW(label, WM_SETFONT, reinterpret_cast<WPARAM>(smallFont_), FALSE);
     auto createPane = [&](Pane& pane, const wchar_t* name, int base) {
         pane.owner = this; pane.row = Scale(44); pane.inset = Scale(8);
@@ -111,7 +106,6 @@ void ControlPanel::Create() {
             WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
             0, 0, 1, 1, window_, nullptr, instance_, &pane);
         if (!pane.window) throw std::runtime_error("Cannot create scrollable payload list.");
-        pane.empty = Add(pane.window, L"STATIC", L"No matches. Try another name or clear the search.", SS_LEFT);
         pane.order.resize(pane.names.size()); std::iota(pane.order.begin(), pane.order.end(), size_t(0));
         std::stable_sort(pane.order.begin(), pane.order.end(), [&](size_t a, size_t b) { return Lower(pane.names[a]) < Lower(pane.names[b]); });
         pane.buttons.resize(pane.names.size());
@@ -124,58 +118,38 @@ void ControlPanel::Create() {
     for (const auto& visual : VisualPayloads::Registry()) visuals_.names.push_back(Wide(visual.name));
     for (const auto& audio : SoundPayloads::Registry()) audio_.names.push_back(Wide(audio.name));
     createPane(visuals_, L"Visual effects", VisualBase); createPane(audio_, L"Audio loops", AudioBase);
-    for (auto child : {search_, clear_, visualTab_, audioTab_, visuals_.window, audio_.window,
+    for (auto child : {visualTab_, audioTab_, visuals_.window, audio_.window,
             finaleStyle_, finale_, stop_, close_})
         SetWindowPos(child, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    Filter(); Refresh(); Layout();
+    Refresh(); Layout();
     ShowWindow(window_, SW_SHOW); UpdateWindow(window_);
-    SetFocus(search_);
-}
-
-void ControlPanel::Pane::Filter(const std::wstring& query) {
-    visible.clear(); offset = 0;
-    for (size_t index : order) {
-        bool match = query.empty() || Lower(names[index]).find(query) != std::wstring::npos;
-        ShowWindow(buttons[index], match ? SW_SHOW : SW_HIDE);
-        if (match) visible.push_back(index);
-    }
-    ShowWindow(empty, visible.empty() ? SW_SHOW : SW_HIDE);
-    Reflow();
+    SetFocus(compact_ ? visualTab_ : (visuals_.order.empty() ? stop_ : visuals_.buttons[visuals_.order.front()]));
 }
 
 void ControlPanel::Pane::Reflow() {
-    if (!empty) return; // WM_SIZE can arrive while the pane is being created.
+    if (buttons.size() != order.size() || (!order.empty() && !buttons[order.back()])) return;
     RECT rect{}; GetClientRect(window, &rect);
-    int total = int(visible.size()) * row + inset * 2;
+    int total = int(order.size()) * row + inset * 2;
     offset = std::clamp(offset, 0, std::max(0, total - int(rect.bottom)));
     SCROLLINFO scroll{sizeof(SCROLLINFO), SIF_RANGE | SIF_PAGE | SIF_POS,
         0, std::max(0, total - 1), static_cast<UINT>(rect.bottom), offset, 0};
     SetScrollInfo(window, SB_VERT, &scroll, TRUE);
     GetClientRect(window, &rect);
-    HDWP positions = BeginDeferWindowPos(int(visible.size()) + 1);
+    HDWP positions = BeginDeferWindowPos(int(order.size()));
     auto move = [&](HWND child, int x, int y, int width, int height) {
         if (positions) positions = DeferWindowPos(positions, child, nullptr, x, y, std::max(1, width), height, SWP_NOZORDER | SWP_NOACTIVATE);
         else MoveWindow(child, x, y, std::max(1, width), height, TRUE);
     };
-    for (size_t display = 0; display < visible.size(); ++display)
-        move(buttons[visible[display]], inset, inset + int(display) * row - offset,
+    for (size_t display = 0; display < order.size(); ++display)
+        move(buttons[order[display]], inset, inset + int(display) * row - offset,
             rect.right - inset * 2, row - owner->Scale(4));
-    move(empty, inset * 2, inset * 2, rect.right - inset * 4, owner->Scale(64));
     if (positions) EndDeferWindowPos(positions);
     InvalidateRect(window, nullptr, TRUE);
 }
-void ControlPanel::Pane::Scroll(int position) { offset = position; Reflow(); }
-
-void ControlPanel::Filter() {
-    if (!visuals_.empty || !audio_.empty) return;
-    wchar_t buffer[129]{}; GetWindowTextW(search_, buffer, 129);
-    std::wstring query = Lower(buffer);
-    size_t first = query.find_first_not_of(L" \t\r\n"), last = query.find_last_not_of(L" \t\r\n");
-    if (first == std::wstring::npos) query.clear();
-    else query = query.substr(first, last - first + 1);
-    visuals_.Filter(query); audio_.Filter(query);
-    EnableWindow(clear_, buffer[0] != 0);
-    Refresh(errorText_);
+void ControlPanel::Pane::Scroll(int position) {
+    RECT rect{}; GetClientRect(window, &rect);
+    position = std::clamp(position, 0, std::max(0, int(order.size()) * row + inset * 2 - int(rect.bottom)));
+    if (position != offset) { offset = position; Reflow(); }
 }
 
 void ControlPanel::Layout() {
@@ -191,9 +165,6 @@ void ControlPanel::Layout() {
     move(title_, pad, Scale(18), available - Scale(128), Scale(34));
     move(stop_, w - pad - Scale(112), Scale(18), Scale(112), Scale(36));
     move(description_, pad, Scale(60), available, Scale(34));
-    move(searchLabel_, pad, Scale(98), available, Scale(18));
-    move(search_, pad, Scale(120), available - Scale(84), Scale(34));
-    move(clear_, w - pad - Scale(72), Scale(120), Scale(72), Scale(34));
     show(visualsTitle_, !compact_); show(audioTitle_, !compact_);
     show(visualTab_, compact_); show(audioTab_, compact_);
     show(visualsHelp_, !compact_ || !audioView_); show(audioHelp_, !compact_ || audioView_);
@@ -201,23 +172,23 @@ void ControlPanel::Layout() {
     int statusHeight = Scale(errorText_.empty() ? 44 : (compact_ ? 76 : 60));
     int statusY = h - Scale(54) - statusHeight;
     int actionsY = statusY - Scale(50);
-    int top = Scale(compact_ ? 240 : 226);
+    int top = Scale(compact_ ? 160 : 146);
     int bottom = actionsY - Scale(compact_ ? 46 : 18);
     if (compact_) {
-        move(visualTab_, pad, Scale(170), (available - Scale(8)) / 2, Scale(34));
-        move(audioTab_, pad + (available + Scale(8)) / 2, Scale(170), (available - Scale(8)) / 2, Scale(34));
-        move(visualsHelp_, pad, Scale(212), available, Scale(20));
-        move(audioHelp_, pad, Scale(212), available, Scale(20));
+        move(visualTab_, pad, Scale(90), (available - Scale(8)) / 2, Scale(34));
+        move(audioTab_, pad + (available + Scale(8)) / 2, Scale(90), (available - Scale(8)) / 2, Scale(34));
+        move(visualsHelp_, pad, Scale(132), available, Scale(20));
+        move(audioHelp_, pad, Scale(132), available, Scale(20));
         move(visuals_.window, pad, top, available, bottom - top);
         move(audio_.window, pad, top, available, bottom - top);
         move(finaleLabel_, pad, actionsY - Scale(26), available, Scale(20));
         move(finaleStyle_, pad, actionsY, available - Scale(172), Scale(220));
         move(finale_, w - pad - Scale(160), actionsY, Scale(160), Scale(34));
     } else {
-        move(visualsTitle_, pad, Scale(170), column, Scale(24));
-        move(audioTitle_, right, Scale(170), w - pad - right, Scale(24));
-        move(visualsHelp_, pad, Scale(198), column, Scale(20));
-        move(audioHelp_, right, Scale(198), w - pad - right, Scale(20));
+        move(visualsTitle_, pad, Scale(90), column, Scale(24));
+        move(audioTitle_, right, Scale(90), w - pad - right, Scale(24));
+        move(visualsHelp_, pad, Scale(118), column, Scale(20));
+        move(audioHelp_, right, Scale(118), w - pad - right, Scale(20));
         move(visuals_.window, pad, top, column, bottom - top);
         move(audio_.window, right, top, w - pad - right, bottom - top);
         move(finaleLabel_, pad, actionsY + Scale(8), Scale(128), Scale(20));
@@ -231,7 +202,10 @@ void ControlPanel::Layout() {
     HWND focus = GetFocus();
     if (compact_ && IsChild(audioView_ ? visuals_.window : audio_.window, focus))
         SetFocus(audioView_ ? audioTab_ : visualTab_);
-    else if (!compact_ && (focus == visualTab_ || focus == audioTab_)) SetFocus(search_);
+    else if (!compact_ && (focus == visualTab_ || focus == audioTab_)) {
+        Pane& pane = focus == audioTab_ ? audio_ : visuals_;
+        if (!pane.order.empty()) SetFocus(pane.buttons[pane.order.front()]);
+    }
     InvalidateRect(window_, nullptr, TRUE);
 }
 
@@ -251,9 +225,7 @@ void ControlPanel::Refresh(const std::wstring& error) {
         if (SendMessageW(button, BM_GETCHECK, 0, 0) != check) { SendMessageW(button, BM_SETCHECK, check, 0); InvalidateRect(button, nullptr, TRUE); }
     }
     auto heading = [](const Pane& pane, const std::wstring& name) {
-        std::wstring text = name + L" (" + std::to_wstring(pane.visible.size());
-        if (pane.visible.size() != pane.names.size()) text += L"/" + std::to_wstring(pane.names.size());
-        return text + L")";
+        return name + L" (" + std::to_wstring(pane.names.size()) + L")";
     };
     Text(visualsTitle_, heading(visuals_, L"Visual effects")); Text(audioTitle_, heading(audio_, L"Audio loops"));
     Text(visualTab_, heading(visuals_, L"Visuals")); Text(audioTab_, heading(audio_, L"Audio"));
@@ -274,13 +246,7 @@ void ControlPanel::SetPreviewActive(bool active) {
 }
 
 bool ControlPanel::HandleMessage(const MSG& message) {
-    if (message.message != WM_KEYDOWN) return false;
-    if (message.wParam == 'F' && (GetKeyState(VK_CONTROL) & 0x8000)) {
-        SetFocus(search_); SendMessageW(search_, EM_SETSEL, 0, -1); return true;
-    }
-    if (message.wParam == VK_ESCAPE && GetWindowTextLengthW(search_) > 0 && !(GetKeyState(VK_CONTROL) & 0x8000)) {
-        Text(search_, L""); SetFocus(search_); return true;
-    }
+    (void)message;
     return false;
 }
 
@@ -294,8 +260,7 @@ void ControlPanel::Command(int id) {
     } else if (id == StopAll) {
         std::fill(controls_.visuals.begin(), controls_.visuals.end(), false);
         controls_.audio = -1; ++controls_.audioRevision;
-    } else if (id == ClearSearch) { Text(search_, L""); SetFocus(search_); return; }
-    else if (id == VisualTab || id == AudioTab) {
+    } else if (id == VisualTab || id == AudioTab) {
         audioView_ = id == AudioTab; Layout();
         InvalidateRect(visualTab_, nullptr, TRUE); InvalidateRect(audioTab_, nullptr, TRUE);
         return;
@@ -357,7 +322,6 @@ LRESULT CALLBACK ControlPanel::WindowProc(HWND window, UINT msg, WPARAM wParam, 
             RECT rect{}; GetClientRect(window, &rect);
             FillRect(reinterpret_cast<HDC>(wParam), &rect, panel->groundBrush_); return 1;
         }
-        if (msg == WM_COMMAND && LOWORD(wParam) == Search && HIWORD(wParam) == EN_CHANGE) { panel->Filter(); return 0; }
         if (msg == WM_COMMAND && LOWORD(wParam) == FinaleStyle && HIWORD(wParam) == CBN_SELCHANGE) {
             LRESULT selection = SendMessageW(panel->finaleStyle_, CB_GETCURSEL, 0, 0);
             if (selection >= 0 && selection <= 5) panel->controls_.finaleStyle = static_cast<BlueScreenStyle>(selection);
@@ -368,7 +332,7 @@ LRESULT CALLBACK ControlPanel::WindowProc(HWND window, UINT msg, WPARAM wParam, 
         if (msg == WM_CTLCOLORSTATIC || msg == WM_CTLCOLOREDIT || msg == WM_CTLCOLORLISTBOX) {
             HDC dc = reinterpret_cast<HDC>(wParam); HWND child = reinterpret_cast<HWND>(lParam);
             bool field = msg != WM_CTLCOLORSTATIC;
-            bool muted = child == panel->description_ || child == panel->hint_ || child == panel->visualsHelp_ || child == panel->audioHelp_ || child == panel->searchLabel_ || child == panel->finaleLabel_;
+            bool muted = child == panel->description_ || child == panel->hint_ || child == panel->visualsHelp_ || child == panel->audioHelp_ || child == panel->finaleLabel_;
             SetTextColor(dc, muted ? panel->muted_ : panel->ink_);
             SetBkColor(dc, field ? panel->surface_ : panel->ground_);
             return reinterpret_cast<LRESULT>(field ? panel->surfaceBrush_ : panel->groundBrush_);
@@ -410,20 +374,19 @@ LRESULT CALLBACK ControlPanel::PaneProc(HWND window, UINT msg, WPARAM wParam, LP
         if (msg == WM_SIZE) { pane->Reflow(); return 0; }
         if (msg == WM_CTLCOLORBTN || msg == WM_CTLCOLORSTATIC) {
             // Windows can send WM_CTLCOLORSTATIC for checkbox backgrounds too.
-            bool selected = reinterpret_cast<HWND>(lParam) != pane->empty &&
-                SendMessageW(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0) == BST_CHECKED;
+            bool selected = SendMessageW(reinterpret_cast<HWND>(lParam), BM_GETCHECK, 0, 0) == BST_CHECKED;
             auto* panel = pane->owner; HDC dc = reinterpret_cast<HDC>(wParam);
             SetTextColor(dc, selected && panel->highContrast_ ? GetSysColor(COLOR_HIGHLIGHTTEXT) : panel->ink_);
             SetBkColor(dc, selected ? panel->selected_ : panel->surface_);
             return reinterpret_cast<LRESULT>(selected ? panel->selectedBrush_ : panel->surfaceBrush_);
         }
         if (msg == WM_MOUSEWHEEL) {
-            pane->wheel += static_cast<short>(HIWORD(wParam));
-            int steps = pane->wheel / WHEEL_DELTA; pane->wheel %= WHEEL_DELTA;
             UINT lines = 3; SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
             RECT rect{}; GetClientRect(window, &rect);
-            int distance = lines == WHEEL_PAGESCROLL ? int(rect.bottom) : int(lines) * pane->row;
-            pane->Scroll(pane->offset - steps * distance); return 0;
+            int distance = lines == WHEEL_PAGESCROLL ? int(rect.bottom) : int(std::min(lines, UINT(100))) * pane->row;
+            pane->wheel += static_cast<short>(HIWORD(wParam)) * distance;
+            int pixels = pane->wheel / WHEEL_DELTA; pane->wheel %= WHEEL_DELTA;
+            pane->Scroll(pane->offset - pixels); return 0;
         }
         if (msg == WM_VSCROLL) {
             SCROLLINFO info{sizeof(SCROLLINFO), SIF_ALL, 0, 0, 0, 0, 0}; GetScrollInfo(window, SB_VERT, &info);
@@ -434,6 +397,7 @@ LRESULT CALLBACK ControlPanel::PaneProc(HWND window, UINT msg, WPARAM wParam, LP
             case SB_PAGEUP: position -= int(info.nPage); break;
             case SB_PAGEDOWN: position += int(info.nPage); break;
             case SB_THUMBTRACK: position = info.nTrackPos; break;
+            case SB_THUMBPOSITION: position = info.nTrackPos; break;
             case SB_TOP: position = 0; break;
             case SB_BOTTOM: position = info.nMax; break;
             default: break;

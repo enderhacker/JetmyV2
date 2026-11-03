@@ -107,51 +107,42 @@ foreach ($pattern in $SourcePatterns) {
 }
 
 # ------------------------------------------------------------------------------
-# 4. Resolve Path with Spaces (Auto-Fix for default-manifest.o)
+# 4. Neutralize default-manifest.o (Fixes MinGW Space in Path Bug)
 # ------------------------------------------------------------------------------
 $binDir = Split-Path -Parent $gppPath
 $rootDir = Split-Path -Parent $binDir
-$substDrive = $null
+$env:PATH = "$binDir;" + $env:PATH
 $resObj = "resources.o"
 
-try {
-    if ($gppPath -match ' ') {
-        $shortBin = $null
+# If the compiler path contains spaces, disable default-manifest.o so ld doesn't choke
+if ($gppPath -match ' ') {
+    $manifestFiles = Get-ChildItem -Path $rootDir -Filter "default-manifest.o" -Recurse -File -ErrorAction SilentlyContinue
+    foreach ($mFile in $manifestFiles) {
         try {
-            $fso = New-Object -ComObject Scripting.FileSystemObject
-            $shortBin = $fso.GetFolder($binDir).ShortPath
+            Rename-Item -Path $mFile.FullName -NewName "default-manifest.o.disabled" -Force -ErrorAction SilentlyContinue
+            Write-Host "[*] Disabled unquoted $($mFile.Name) (fixes path-with-spaces bug)" -ForegroundColor Yellow
         } catch {}
+    }
+}
 
-        if ($shortBin -and ($shortBin -notmatch ' ') -and (Test-Path "$shortBin\g++.exe")) {
-            $gppPath = "$shortBin\g++.exe"
-            $binDir = $shortBin
-            $env:PATH = "$shortBin;" + $env:PATH
-        } else {
-            $usedDrives = [System.IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1).ToUpper() }
-            $availableDrive = ([char[]](65..90) | Where-Object { $_ -notin $usedDrives } | Select-Object -Last 1)
-
-            if ($availableDrive) {
-                $substDrive = "${availableDrive}:"
-                subst $substDrive "$rootDir" > $null
-                $gppPath = "$substDrive\bin\g++.exe"
-                $binDir = "$substDrive\bin"
-                $env:PATH = "$substDrive\bin;" + $env:PATH
-            }
-        }
-    } else {
-        $env:PATH = "$binDir;" + $env:PATH
+try {
+    # --------------------------------------------------------------------------
+    # 5. Compile Resource File (.rc) if Present (version.rc or resources.rc)
+    # --------------------------------------------------------------------------
+    $rcFile = $null
+    if (Test-Path "version.rc") {
+        $rcFile = "version.rc"
+    } elseif (Test-Path "resources.rc") {
+        $rcFile = "resources.rc"
     }
 
-    # --------------------------------------------------------------------------
-    # 5. Compile Resource File (.rc) if Present
-    # --------------------------------------------------------------------------
-    if (Test-Path "resources.rc") {
+    if ($rcFile) {
         $windresPath = Join-Path $binDir "windres.exe"
         if (Test-Path $windresPath) {
-            Write-Host "[*] Compiling resources.rc..." -ForegroundColor Cyan
-            & $windresPath "-i" "resources.rc" "-o" $resObj "--input-format=rc" "--output-format=coff"
+            Write-Host "[*] Compiling $rcFile -> $resObj..." -ForegroundColor Cyan
+            & $windresPath "-i" $rcFile "-o" $resObj "--input-format=rc" "--output-format=coff"
             if ($LASTEXITCODE -ne 0) {
-                Write-Host "[!] ERROR: windres failed to compile resources.rc" -ForegroundColor Red
+                Write-Host "[!] ERROR: windres failed to compile $rcFile" -ForegroundColor Red
                 exit $LASTEXITCODE
             }
             $Sources.Add($resObj)
@@ -161,13 +152,10 @@ try {
     # --------------------------------------------------------------------------
     # 6. Target Architecture & OS Subsystem Detection
     # --------------------------------------------------------------------------
-    # Detect 32-bit vs 64-bit target from compiler
     $machine = & $gppPath -dumpmachine
     if ($machine -match "x86_64") {
-        # 64-bit: Windows XP Pro x64 / Server 2003 is NT 5.2. Runs on XP64 -> Win11
         $subsystemArg = "-Wl,--subsystem,windows:5.2"
     } else {
-        # 32-bit: Windows XP 32-bit is NT 5.1. Runs on XP -> Win11
         $subsystemArg = "-Wl,--subsystem,windows:5.1"
     }
 
@@ -194,38 +182,38 @@ try {
         "-Wno-unused-parameter"
 
         # === SPEED OPTIMIZATION ===
-        "-O3"                   # Aggressive vectorization & loop optimization
-        "-ffast-math"           # Maximum floating-point & sinusoidal speed
-        "-funroll-loops"        # Unrolls render/audio loops for instruction parallelism
-        "-mtune=generic"        # Fast on modern CPUs while remaining 100% compatible with older CPUs
+        "-O3"
+        "-ffast-math"
+        "-funroll-loops"
+        "-mtune=generic"
 
         # === ANTI-DECOMPILATION & STRIPPING ===
-        "-s"                    # Strips all symbols and debug data
-        "-fno-ident"            # Removes GCC compiler signatures & metadata from .comment section
-        "-fno-rtti"             # Strips C++ runtime type inspection & class names
-        "-fomit-frame-pointer"  # Reuses RBP/EBP as register, breaking decompiler stack reconstructions
-        "-flto"                 # Whole-program optimization: inlines and merges cross-file functions
-        "-Wl,--build-id=none"   # Eliminates GNU build hash headers
-        "-ffunction-sections"   # Isolates functions for tree-shaking
-        "-fdata-sections"       # Isolates data items for tree-shaking
-        "-Wl,--gc-sections"     # Discards all unreferenced dead code and strings
+        "-s"
+        "-fno-ident"
+        "-fno-rtti"
+        "-fomit-frame-pointer"
+        "-flto"
+        "-Wl,--build-id=none"
+        "-ffunction-sections"
+        "-fdata-sections"
+        "-Wl,--gc-sections"
 
-        # === OS COMPATIBILITY (XP, Vista, 7, 8, 10, 11) ===
-        $subsystemArg           # Sets PE header major/minor subsystem version to 5.x
-        "-mwindows"             # GUI subsystem (no black console prompt)
+        # === OS COMPATIBILITY ===
+        $subsystemArg
+        "-mwindows"
 
         # === STANDALONE PORTABILITY ===
-        "-static"               # Avoids dynamic library dependencies
-        "-static-libgcc"        # Embeds GCC C runtime
-        "-static-libstdc++"     # Embeds C++ standard library runtime
+        "-static"
+        "-static-libgcc"
+        "-static-libstdc++"
 
         # === LINKED LIBRARIES ===
-        "-lgdi32"               # Windows GDI (BitBlt, StretchBlt, DCs)
-        "-luser32"              # Windows UI (GetDC, message loops)
-        "-lwinmm"               # Audio / WaveOut playback
-        "-lshell32"             # Shell API
-        "-lmsimg32"             # AlphaBlend, TransparentBlt, GradientFill
-        "-ldwmapi"              # Desktop Window Manager effects
+        "-lgdi32"
+        "-luser32"
+        "-lwinmm"
+        "-lshell32"
+        "-lmsimg32"
+        "-ldwmapi"
     )
 
     & $gppPath $CompilerArgs
@@ -251,9 +239,5 @@ finally {
     # Clean up temporary resource object
     if (Test-Path $resObj) {
         Remove-Item $resObj -Force -ErrorAction SilentlyContinue
-    }
-    # Clean up virtual drive if mounted
-    if ($substDrive) {
-        subst $substDrive /d > $null 2>&1
     }
 }

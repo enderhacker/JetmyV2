@@ -30,12 +30,10 @@ private:
     struct Pane {
         ControlPanel* owner = nullptr;
         HWND window = nullptr;
-        HWND empty = nullptr;
         std::vector<HWND> buttons;
         std::vector<std::wstring> names;
-        std::vector<size_t> order, visible;
+        std::vector<size_t> order;
         int offset = 0, row = 44, inset = 8, wheel = 0;
-        void Filter(const std::wstring& query);
         void Reflow();
         void Scroll(int position);
     };
@@ -45,7 +43,6 @@ private:
     HWND Add(HWND parent, const wchar_t* kind, const std::wstring& text, DWORD style, int id = 0);
     int Scale(int value) const { return MulDiv(value, dpi_, 96); }
     void Layout();
-    void Filter();
     void DrawButton(const DRAWITEMSTRUCT& item);
     void Command(int id);
     HINSTANCE instance_;
@@ -54,7 +51,6 @@ private:
     HWND visualsTitle_ = nullptr, audioTitle_ = nullptr, stop_ = nullptr, close_ = nullptr, status_ = nullptr, hint_ = nullptr;
     HWND finale_ = nullptr;
     HWND finaleLabel_ = nullptr, finaleStyle_ = nullptr;
-    HWND searchLabel_ = nullptr, search_ = nullptr, clear_ = nullptr;
     HWND visualTab_ = nullptr, audioTab_ = nullptr, visualsHelp_ = nullptr, audioHelp_ = nullptr;
     HWND hovered_ = nullptr;
     Pane visuals_, audio_;
