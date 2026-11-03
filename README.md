@@ -300,8 +300,9 @@ been established by the availability of those styles.
 | The finale differs from a particular Windows screenshot | Presets represent selected historical designs, retain the requested 4:3 presentation, and do not reproduce every OS revision or screen aspect ratio. |
 
 The rendering loop targets roughly 60 frames per second, but that is not a
-guarantee. Full-screen effects use resolution-scaled sampling to bound their work;
-this can make fine details look blockier at high resolutions. Protected content,
+guarantee. Many full-screen effects render at native resolution through 1440p;
+some expensive effects and larger displays use reduced sampling to bound their
+work, which can make fine details appear blockier. Protected content,
 secure desktops, remote sessions, and some capture environments may not behave
 like a normal local Windows desktop.
 

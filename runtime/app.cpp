@@ -125,6 +125,19 @@ bool ExitRequested() {
         ((GetAsyncKeyState('Q') & 0x8000) || (GetAsyncKeyState(VK_ESCAPE) & 0x8000)));
 }
 
+// BitBlt does not include the hardware cursor. Add it only to tunnel textures.
+void DrawCapturedCursor(HDC dc) {
+    CURSORINFO cursor{}; cursor.cbSize = sizeof(cursor);
+    if (!GetCursorInfo(&cursor) || !(cursor.flags & CURSOR_SHOWING) || !cursor.hCursor) return;
+    ICONINFO icon{};
+    if (!GetIconInfo(cursor.hCursor, &icon)) return;
+    DrawIconEx(dc, cursor.ptScreenPos.x - static_cast<int>(icon.xHotspot),
+        cursor.ptScreenPos.y - static_cast<int>(icon.yHotspot), cursor.hCursor, 0, 0, 0, nullptr, DI_NORMAL);
+    if (icon.hbmMask) DeleteObject(icon.hbmMask);
+    if (icon.hbmColor) DeleteObject(icon.hbmColor);
+    GdiFlush();
+}
+
 int Run(HINSTANCE instance, bool menuMode) {
     using namespace VisualPayloads;
     using Clock = std::chrono::steady_clock;
@@ -147,12 +160,10 @@ int Run(HINSTANCE instance, bool menuMode) {
     Runtime::ControlPanel menu(instance, controls);
     if (menuMode) menu.Create();
     SoundPayloads::Player sound; // Destroy sound before removing overlay and buffers.
-    int echoW = std::max(1, g_ScreenWidth / 4), echoH = std::max(1, g_ScreenHeight / 4);
+    int echoScale = std::max(1, static_cast<int>(ceil(sqrt(double(g_ScreenWidth) * g_ScreenHeight / 2100000.0))));
+    int echoW = std::max(1, (g_ScreenWidth + echoScale - 1) / echoScale);
+    int echoH = std::max(1, (g_ScreenHeight + echoScale - 1) / echoScale);
     g_EchoHistory.resize(MAX_ECHOES);
-    for (auto& echo : g_EchoHistory) {
-        echo.w = echoW; echo.h = echoH;
-        echo.pixels.resize(static_cast<size_t>(echoW) * echoH);
-    }
 
     std::mt19937 random(std::random_device{}());
     g_FastState = random() | 1u;
@@ -236,10 +247,10 @@ int Run(HINSTANCE instance, bool menuMode) {
             }
             overlay.ProtectMenu(menu.Window());
         }
-        bool anyVisual = false;
+        bool anyVisual = false, needsEcho = false;
         for (size_t i = 0; i < controls.visuals.size(); ++i) {
             if (!controls.visuals[i]) wasEnabled[i] = false;
-            else anyVisual = true;
+            else { anyVisual = true; needsEcho |= visuals[i].fn == EffectDesktopTimeEchoes; }
         }
         if (menuMode) menu.SetPreviewActive(anyVisual);
         if (!anyVisual) {
@@ -256,16 +267,23 @@ int Run(HINSTANCE instance, bool menuMode) {
         ReleaseDC(nullptr, desktop);
         if (!captured) throw std::runtime_error("Desktop capture failed.");
         GdiFlush(); // Synchronize GDI writes before accessing DIB memory.
-        echoTick += dt;
-        if (!historyReady || echoTick >= 0.08f) {
+        if (!needsEcho) { historyReady = false; echoTick = 0; g_EchoHead = 0; }
+        else echoTick += dt;
+        if (needsEcho && (!historyReady || echoTick >= 0.08f)) {
             echoTick = 0;
             auto& echo = g_EchoHistory[g_EchoHead % MAX_ECHOES];
-            for (int y = 0; y < echoH; ++y)
+            echo.w = echoW; echo.h = echoH;
+            echo.pixels.resize(static_cast<size_t>(echoW) * echoH);
+            if (echoScale == 1) memcpy(echo.pixels.data(), base.pixels, totalBytes);
+            else for (int y = 0; y < echoH; ++y)
                 for (int x = 0; x < echoW; ++x)
                     echo.pixels[y * echoW + x] = base.pixels[(y * g_ScreenHeight / echoH) * g_ScreenWidth + x * g_ScreenWidth / echoW];
             ++g_EchoHead;
             if (!historyReady) {
-                for (size_t i = 1; i < MAX_ECHOES; ++i) g_EchoHistory[i].pixels = echo.pixels;
+                for (size_t i = 1; i < MAX_ECHOES; ++i) {
+                    g_EchoHistory[i].w = echoW; g_EchoHistory[i].h = echoH;
+                    g_EchoHistory[i].pixels = echo.pixels;
+                }
                 historyReady = true;
             }
         }
@@ -279,6 +297,7 @@ int Run(HINSTANCE instance, bool menuMode) {
             float age = firstFrame ? 0 : std::chrono::duration<float>(now - activated[index]).count();
             const auto& payload = visuals[index];
             if (payload.needsSnapshot) memcpy(scratch.pixels, frame.pixels, totalBytes);
+            if (payload.fn == EffectInfiniteTunnel || payload.fn == Effect3DWarpTunnel) DrawCapturedCursor(scratch.dc);
             if (payload.blackBackground) std::fill_n(frame.pixels, totalBytes / sizeof(uint32_t), 0u);
             payload.fn(age, firstFrame ? 0 : std::min(dt, 0.1f));
             wasEnabled[index] = true;

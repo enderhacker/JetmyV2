@@ -109,13 +109,14 @@ inline void Tint(int x, int y, int w, int h, uint32_t color, float opacity) {
         for (int xx = std::max(0, x); xx < right; ++xx) row[xx] = BlendColor(row[xx], color, opacity);
     }
 }
-// Bound full-screen raster effects to about one million samples even at 4K.
+// Render at native resolution through 1440p; bound work on larger displays.
 inline int RasterStep() {
     int64_t area = static_cast<int64_t>(g_ScreenWidth) * g_ScreenHeight;
-    return area > 16000000 ? 8 : area > 4000000 ? 4 : 2;
+    return area > 16000000 ? 4 : area > 4000000 ? 2 : 1;
 }
 inline void Tile(int x, int y, int step, uint32_t color) {
-    if (step == 2) DrawBlock(x, y, color);
+    if (step == 1) Pixel(x, y, color);
+    else if (step == 2) DrawBlock(x, y, color);
     else Fill(x, y, step, step, color);
 }
 

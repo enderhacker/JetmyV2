@@ -25,7 +25,7 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | RGB Spectral Phantoms | Separates and shifts the desktop's red, green and blue channels. |
 | Kaleidoscopic Reality | Mirrors the desktop into six rotating kaleidoscope sectors. |
 | Gravity Paint | Thin paint drips leave winding trails that remain while the effect is enabled. |
-| Desktop Time Echoes | Moving panes blend delayed snapshots of the desktop. |
+| Desktop Time Echoes | Moving panes blend detailed delayed snapshots of the desktop. |
 | 3D Warp Tunnel | Maps the desktop onto a perspective tunnel with rings and radial ribs. |
 | Infinite Desktop City | Flies down a night-time avenue between desktop-textured skyscrapers, with luminous window grids, street reflections and distance fog. |
 | Desktop Planet | Wraps the desktop around a rotating globe with atmospheric glow and a tilted, textured ring that passes in front and behind. |
@@ -38,8 +38,8 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Reality Collapse Finale | Compresses the screen vertically and horizontally, then reopens it with an afterglow. |
 | Rotate Screen | Continuously rotates the captured desktop image around its center. |
 | Random Status Icons | Places warning, success, information and error icons at random positions and sizes. |
-| Melting Screen | Stretches the desktop downward in uneven, gravity-driven folds with wet edges and pooling. |
-| Infinite Tunnel | Repeated shrinking desktop copies enter from beyond the screen edges for a continuous rectangular tunnel without outer-frame popping. |
+| Melting Screen | Stretches the desktop downward in uneven folds, then fades in a fresh image for the next melt. |
+| Infinite Tunnel | Repeated shrinking desktop copies, including the visible cursor, form a continuous rectangular tunnel. |
 | XOR Color Chaos | Animated XOR patterns mix the desktop's colors into moving geometric interference. |
 | Screen Color Inversion | Inverts every desktop color while enabled, without changing display settings. |
 | Popup Cascade | 24 simulated system messages with OS-aware XP, Vista/7, Windows 10 or Windows 11 styling, system fonts, DPI-scaled layouts and status icons; no real dialogs open. |

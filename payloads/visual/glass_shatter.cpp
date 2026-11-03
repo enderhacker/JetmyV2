@@ -77,7 +77,7 @@ void EffectDesktopGlassShatter(float time, float) {
                 if (u < 0 || v < 0 || w < 0) continue;
                 float seam = fabsf(determinant) * std::min({u / std::max(0.001f, edgeA),
                     v / std::max(0.001f, edgeB), w / std::max(0.001f, edgeC)});
-                Tile(x, y, step, BlendColor(Sample(int(sx), int(sy)), 0xC5EBFF, seam < 2 ? 0.8f : 0.07f));
+                Tile(x, y, step, BlendColor(Sample(int(sx), int(sy)), 0xC5EBFF, seam < 0.7f ? 0.45f : 0.025f));
             }
         }
     }

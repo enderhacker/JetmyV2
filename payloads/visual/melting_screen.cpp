@@ -16,7 +16,7 @@ void EffectMeltingScreen(float time, float) {
             knot = {FastRandFloat(0.1f, 2.0f), FastRandFloat(0.012f, 0.035f), FastRandFloat(0.65f, 1.3f)};
     }
     offsets.resize(g_ScreenWidth);
-    float restore = 1 - Smooth((phase - 11.5f) / 2.5f);
+    float fade = Smooth((phase - 11.0f) / 2.8f);
     for (int x = 0; x < g_ScreenWidth; ++x) {
         float position = float(x) * (KnotCount - 1) / std::max(1, g_ScreenWidth - 1);
         size_t index = std::min(KnotCount - 2, static_cast<size_t>(position));
@@ -28,15 +28,15 @@ void EffectMeltingScreen(float time, float) {
         float age = std::max(0.0f, phase - delay);
         // Neighboring columns flow together, but differently delayed lobes accelerate
         // under gravity. There is no sideways sine wave or per-frame random jitter.
-        offsets[x] = std::min(1.45f, acceleration * age * age * bulge) * g_ScreenHeight * restore;
+        offsets[x] = acceleration * age * age * bulge * g_ScreenHeight;
     }
     int step = RasterStep();
     for (int x = 0; x < g_ScreenWidth; x += step) {
         float displacement = offsets[x];
-        float front = displacement * 0.50f;
+        float front = displacement;
         float stretch = 1 + displacement / g_ScreenHeight * 0.85f;
         float slope = (offsets[std::min(g_ScreenWidth - 1, x + step)] - offsets[std::max(0, x - step)]) / (2 * step);
-        float poolDepth = std::min(g_ScreenHeight * 0.12f, displacement * 0.09f);
+        float poolDepth = std::min(g_ScreenHeight * 0.12f, displacement * 0.09f) * (1 - Smooth((displacement / g_ScreenHeight - 0.7f) / 0.3f));
         for (int y = 0; y < g_ScreenHeight; y += step) {
             float distance = y - front;
             uint32_t color = 0x000000;
@@ -57,7 +57,7 @@ void EffectMeltingScreen(float time, float) {
                     color = BlendColor(color, 0x080A0D, depth * 0.22f);
                 }
             }
-            Tile(x, y, step, color);
+            Tile(x, y, step, BlendColor(color, Sample(x, y), fade));
         }
     }
 }
