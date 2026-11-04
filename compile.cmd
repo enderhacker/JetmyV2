@@ -4,7 +4,7 @@ setlocal
 cd /d "%~dp0"
 set "SCRIPT_FILE=%~f0"
 
-:: Auto-detect if launched by double-clicking in Windows Explorer
+:: Autodetect if launched by double-clicking in Windows Explorer
 set "IS_INTERACTIVE=0"
 echo %cmdcmdline% | findstr /i /c:"%~nx0" >nul && (
     echo %cmdcmdline% | findstr /i /c:"/c" >nul && set "IS_INTERACTIVE=1"
