@@ -60,8 +60,10 @@ function Find-Compiler {
     )
 
     foreach ($pattern in $knownPaths) {
-        $found = Resolve-Path $pattern -ErrorAction SilentlyContinue
+        $found = Resolve-Path -LiteralPath $pattern -ErrorAction SilentlyContinue
         if ($found) { return $found[0].Path }
+        $glob = Resolve-Path $pattern -ErrorAction SilentlyContinue
+        if ($glob) { return $glob[0].Path }
     }
 
     $cmd = Get-Command "g++.exe" -ErrorAction SilentlyContinue
@@ -88,9 +90,9 @@ if ($running) {
     Start-Sleep -Milliseconds 200
 }
 
-if (Test-Path $Target) {
+if (Test-Path -LiteralPath $Target) {
     try {
-        Remove-Item -Path $Target -Force -ErrorAction Stop
+        Remove-Item -LiteralPath $Target -Force -ErrorAction Stop
     } catch {
         Write-Host "[!] ERROR: Cannot remove '$Target'. File is locked." -ForegroundColor Red
         exit 1
@@ -98,9 +100,9 @@ if (Test-Path $Target) {
 }
 
 # ------------------------------------------------------------------------------
-# 3. Collect Source Files
+# 3. Collect Source Files (Literal paths to support spaces & brackets)
 # ------------------------------------------------------------------------------
-if (-not (Test-Path "main.cpp")) {
+if (-not (Test-Path -LiteralPath "main.cpp")) {
     Write-Host "[!] ERROR: Entry point 'main.cpp' not found in current folder." -ForegroundColor Red
     exit 1
 }
@@ -113,7 +115,7 @@ foreach ($pattern in $SourcePatterns) {
     $files = Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue
     if ($files) {
         foreach ($file in $files) {
-            $rel = Resolve-Path -Path $file.FullName -Relative
+            $rel = Resolve-Path -LiteralPath $file.FullName -Relative
             if (-not $Sources.Contains($rel)) {
                 $Sources.Add($rel)
             }
@@ -122,33 +124,48 @@ foreach ($pattern in $SourcePatterns) {
 }
 
 # ------------------------------------------------------------------------------
-# 4. Neutralize default-manifest.o (Fixes MinGW Space in Path Bug)
+# 4. Environment & default-manifest.o Neutralization
 # ------------------------------------------------------------------------------
 $binDir = Split-Path -Parent $gppPath
 $rootDir = Split-Path -Parent $binDir
 $env:PATH = "$binDir;" + $env:PATH
 $resObj = "resources.o"
 
-if ($gppPath -match ' ') {
-    $manifestFiles = Get-ChildItem -Path $rootDir -Filter "default-manifest.o" -Recurse -File -ErrorAction SilentlyContinue
-    foreach ($mFile in $manifestFiles) {
-        try {
-            Rename-Item -Path $mFile.FullName -NewName "default-manifest.o.disabled" -Force -ErrorAction SilentlyContinue
-            Write-Host "[*] Disabled unquoted $($mFile.Name) (fixes path-with-spaces bug)" -ForegroundColor Yellow
-        } catch {}
-    }
+# Setup MAKE so LTO parallelizes across cores without serial warnings
+$makeExe = Join-Path $binDir "mingw32-make.exe"
+if (Test-Path -LiteralPath $makeExe) {
+    $env:MAKE = $makeExe
+} elseif (Get-Command "make.exe" -ErrorAction SilentlyContinue) {
+    $env:MAKE = (Get-Command "make.exe").Source
+}
+
+# Unconditionally disable default-manifest.o to prevent manifest collisions (.rsrc merge failure)
+# and fix GCC's collect2 unquoted path-with-spaces bug.
+$manifestFiles = Get-ChildItem -LiteralPath $rootDir -Filter "default-manifest.o" -Recurse -File -ErrorAction SilentlyContinue
+foreach ($mFile in $manifestFiles) {
+    try {
+        Rename-Item -LiteralPath $mFile.FullName -NewName "default-manifest.o.disabled" -Force -ErrorAction SilentlyContinue
+    } catch {}
 }
 
 try {
     # --------------------------------------------------------------------------
-    # 5. Architecture & Windows Subsystem Version Setup
+    # 5. Architecture Detection & Platform Specific Optimization
     # --------------------------------------------------------------------------
     $machine = (& $gppPath -dumpmachine).Trim()
+    $archOptArgs = @()
 
     if ($machine -match "i686|i386") {
         Write-Host "[*] Architecture: x86 (32-bit) -> Universally executable (Win 7-11, x86/x64/ARM64)" -ForegroundColor Cyan
         $subsystemArg = "-Wl,--subsystem,windows:5.1"
         $windresTarget = "pe-i386"
+        
+        # Crucial for zero-lag 32-bit math/GDI: Use SSE2 instead of slow x87 FPU stack
+        $archOptArgs += @(
+            "-msse2",
+            "-mfpmath=sse",
+            "-mstackrealign"
+        )
     } else {
         Write-Host "[*] Architecture: x86_64 (64-bit) -> Executable on Win 7, 10, 11 (x64 and Win11 ARM64)" -ForegroundColor Cyan
         $subsystemArg = "-Wl,--subsystem,windows:6.1"
@@ -159,15 +176,15 @@ try {
     # 6. Compile Resource File (.rc) if Present
     # --------------------------------------------------------------------------
     $rcFile = $null
-    if (Test-Path "version.rc") {
+    if (Test-Path -LiteralPath "version.rc") {
         $rcFile = "version.rc"
-    } elseif (Test-Path "resources.rc") {
+    } elseif (Test-Path -LiteralPath "resources.rc") {
         $rcFile = "resources.rc"
     }
 
     if ($rcFile) {
         $windresPath = Join-Path $binDir "windres.exe"
-        if (Test-Path $windresPath) {
+        if (Test-Path -LiteralPath $windresPath) {
             Write-Host "[*] Compiling $rcFile -> $resObj..." -ForegroundColor Cyan
             & $windresPath "-F" $windresTarget "-i" $rcFile "-o" $resObj "--input-format=rc" "--output-format=coff"
             if ($LASTEXITCODE -ne 0) {
@@ -183,6 +200,8 @@ try {
     # --------------------------------------------------------------------------
     Write-Host "[*] Compiling $($Sources.Count) source(s) -> $Target..." -ForegroundColor Cyan
 
+    $cpuCores = [Environment]::ProcessorCount
+
     $CompilerArgs = @(
         # Source & Resource files
         $Sources
@@ -194,30 +213,38 @@ try {
         "-std=c++17"
         "-I."
         "-pthread"
+        "-DNDEBUG"
 
         # Code Warnings
         "-Wall"
         "-Wextra"
         "-Wno-unused-parameter"
 
-        # === OPTIMIZATIONS ===
+        # === HIGH-PERFORMANCE OPTIMIZATIONS (Eliminate Loop / GDI Lag) ===
         "-O3"
         "-ffast-math"
+        "-fno-math-errno"
         "-funroll-loops"
+        "-fomit-frame-pointer"
+        "-falign-functions=16"
+        "-falign-loops=16"
         "-mtune=generic"
-        "-flto=auto"
+        "-flto=$cpuCores"
 
-        # === SIZE REDUCTION & CLEAN BINARY ===
+        # Architecture-specific SIMD & realign flags
+        $archOptArgs
+
+        # === SIZE REDUCTION & CLEAN PE HEADERS ===
         "-s"
         "-fno-ident"
         "-fno-rtti"
-        "-fomit-frame-pointer"
         "-Wl,--build-id=none"
         "-ffunction-sections"
         "-fdata-sections"
         "-Wl,--gc-sections"
+        "-Wl,--file-alignment=512"
 
-        # === OS COMPATIBILITY (Windows 7+ Subsystem) ===
+        # === OS SUBSYSTEM & WINDOWED MODE ===
         $subsystemArg
         "-mwindows"
 
@@ -254,13 +281,13 @@ try {
 
     Write-Host ""
     Write-Host "[+] Build successful in $elapsedStr!" -ForegroundColor Green
-    $fileInfo = Get-Item $Target
+    $fileInfo = Get-Item -LiteralPath $Target
     $sizeKb = [Math]::Round($fileInfo.Length / 1KB, 2)
     Write-Host "[+] Output : $($fileInfo.FullName)" -ForegroundColor Gray
     Write-Host "[+] Size   : $sizeKb KB ($($fileInfo.Length) bytes)" -ForegroundColor Gray
 }
 finally {
-    if (Test-Path $resObj) {
-        Remove-Item $resObj -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $resObj) {
+        Remove-Item -LiteralPath $resObj -Force -ErrorAction SilentlyContinue
     }
 }

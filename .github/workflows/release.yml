@@ -10,48 +10,121 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-and-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # ============================================================================
+  # Fast Cooldown Check (~3 seconds, consumes no Windows runner quota)
+  # ============================================================================
+  check-cooldown:
+    name: Check 15-Min Cooldown
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.cooldown.outputs.skip }}
+    steps:
+      - name: Verify time since last release
+        id: cooldown
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Allow manual workflow triggers to bypass the 15-minute wait
+          if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch") {
+              Write-Host "[*] Manual dispatch triggered. Bypassing 15-minute cooldown."
+              "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+              exit 0
+          }
+
+          # 2. Query GitHub API for the most recent release
+          $releasesJson = gh release list -R "$env:GITHUB_REPOSITORY" --limit 1 --json publishedAt,tagName 2>$null
+          $releases = if ($releasesJson) { $releasesJson | ConvertFrom-Json } else { @() }
+
+          if (-not $releases -or $releases.Count -eq 0 -or -not $releases[0].publishedAt) {
+              Write-Host "[*] No previous releases found. Proceeding with build."
+              "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+              exit 0
+          }
+
+          # 3. Calculate elapsed time
+          $lastRelease = $releases[0]
+          $publishedAt = [DateTimeOffset]::Parse($lastRelease.publishedAt)
+          $now         = [DateTimeOffset]::UtcNow
+          $diffMinutes = ($now - $publishedAt).TotalMinutes
+
+          Write-Host "[*] Last Release : $($lastRelease.tagName)"
+          Write-Host "[*] Published At : $($publishedAt.ToString('u'))"
+          Write-Host "[*] Current Time : $($now.ToString('u'))"
+          Write-Host "[*] Elapsed Time : $([Math]::Round($diffMinutes, 2)) minutes"
+
+          # 4. Check against 15-minute threshold (allowing a slight clock skew margin)
+          if ($diffMinutes -ge -1 -and $diffMinutes -lt 15) {
+              $remaining = [Math]::Ceiling(15 - [Math]::Max(0, $diffMinutes))
+              Write-Host "::warning::Last release ($($lastRelease.tagName)) was published $([Math]::Round($diffMinutes, 1)) minutes ago. Cooldown active ($remaining min remaining). Skipping build."
+              "skip=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          } else {
+              Write-Host "[+] Cooldown satisfied (> 15 minutes). Proceeding to build."
+              "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
+  # ============================================================================
+  # Main Build & Release Job (Only runs if cooldown check passed)
+  # ============================================================================
   build-and-release:
+    name: Build & Release
+    needs: check-cooldown
+    if: needs.check-cooldown.outputs.skip != 'true'
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required to view Git history and previous tags
+          fetch-depth: 0
 
-      - name: Set up MinGW-w64 (winlibs)
+      - name: Set up MinGW-w64 Toolchain
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: MINGW32
           update: false
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-binutils
+            mingw-w64-i686-gcc
+            mingw-w64-i686-binutils
+            mingw-w64-i686-make
+
+      - name: Configure Toolchain Environment
+        run: |
+          "C:\msys64\mingw32\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Compile JetmyV2
-        shell: powershell
         run: |
-          # Add MinGW to the environment PATH so compile.cmd finds g++ and windres
-          $env:PATH = "C:\msys64\mingw64\bin;" + $env:PATH
           cmd.exe /c compile.cmd
-
-          if (-not (Test-Path "JetmyV2.exe")) {
-            Write-Error "JetmyV2.exe was not created."
-            exit 1
+          if ($LASTEXITCODE -ne 0) {
+              throw "compile.cmd failed with exit code $LASTEXITCODE."
           }
+
+          if (-not (Test-Path -LiteralPath "JetmyV2.exe")) {
+              throw "JetmyV2.exe was not produced."
+          }
+
+      - name: Generate Binary Checksum
+        run: |
+          $hash = (Get-FileHash -LiteralPath "JetmyV2.exe" -Algorithm SHA256).Hash
+          "$hash *JetmyV2.exe" | Out-File -FilePath "JetmyV2.exe.sha256" -Encoding ascii
+          Write-Host "SHA256: $hash"
 
       - name: Calculate Next Version Tag
         id: versioning
-        shell: pwsh
         run: |
-          # Fetch all tags from remote just in case
-          git fetch --tags
+          git fetch --tags --force
 
-          # Get all tags matching 'JetmyV2.*'
           $tags = git tag --list "JetmyV2.*"
-
           $highestNum = 0
+
           foreach ($t in $tags) {
               if ($t -match "^JetmyV2\.(\d+)$") {
                   $num = [int]$matches[1]
@@ -61,40 +134,48 @@ jobs:
               }
           }
 
-          $nextNum = $highestNum + 1
-          $newTag = "JetmyV2.$nextNum"
-          $prevTag = if ($highestNum -gt 0) { "JetmyV2.$highestNum" } else { "" }
+          $nextNum  = $highestNum + 1
+          $newTag   = "JetmyV2.$nextNum"
+          $prevTag  = if ($highestNum -gt 0) { "JetmyV2.$highestNum" } else { "" }
 
-          Write-Host "Previous Tag: $prevTag"
-          Write-Host "New Tag     : $newTag"
+          Write-Host "[*] Previous Tag : $prevTag"
+          Write-Host "[*] New Tag      : $newTag"
 
-          "new_tag=$newTag" >> $env:GITHUB_OUTPUT
-          "prev_tag=$prevTag" >> $env:GITHUB_OUTPUT
+          "new_tag=$newTag"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "prev_tag=$prevTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Generate Changelog from Commits
+      - name: Generate Changelog from Git History
         id: changelog
-        shell: pwsh
         run: |
           $prev = "${{ steps.versioning.outputs.prev_tag }}"
           
-          if ($prev -and (git rev-parse --verify "$prev" 2>$null)) {
+          if ($prev -and (git rev-parse --verify "$prev^{commit}" 2>$null)) {
               $log = git log "$prev..HEAD" --pretty=format:"- %s (%h)" --no-merges
           } else {
-              # Fallback for the first release: get the last 30 commits
               $log = git log -n 30 --pretty=format:"- %s (%h)" --no-merges
           }
 
-          if (-not $log) {
-              $log = "- Automated release build."
+          if ([string]::IsNullOrWhiteSpace($log)) {
+              $log = "- Automated release build for ${{ steps.versioning.outputs.new_tag }}."
           }
 
-          # Write multiline output to GITHUB_OUTPUT
           $delimiter = [System.Guid]::NewGuid().ToString()
-          "notes<<$delimiter" >> $env:GITHUB_OUTPUT
-          $log >> $env:GITHUB_OUTPUT
-          "$delimiter" >> $env:GITHUB_OUTPUT
+          @(
+              "notes<<$delimiter"
+              $log
+              $delimiter
+          ) | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Create Release and Upload Asset
+      - name: Upload Build Artifacts (CI Backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: JetmyV2-Binary
+          path: |
+            JetmyV2.exe
+            JetmyV2.exe.sha256
+          retention-days: 14
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.versioning.outputs.new_tag }}
@@ -102,6 +183,8 @@ jobs:
           body: |
             ## What's Changed
             ${{ steps.changelog.outputs.notes }}
-          files: JetmyV2.exe
+          files: |
+            JetmyV2.exe
+            JetmyV2.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
