@@ -1,2 +1,4 @@
 *.exe
 resources.o
+/build/
+__pycache__/

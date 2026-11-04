@@ -107,14 +107,14 @@ jobs:
               throw "compile.cmd failed with exit code $LASTEXITCODE."
           }
 
-          if (-not (Test-Path -LiteralPath "JetmyV2.exe")) {
+          if (-not (Test-Path -LiteralPath "build/JetmyV2.exe")) {
               throw "JetmyV2.exe was not produced."
           }
 
       - name: Generate Binary Checksum
         run: |
-          $hash = (Get-FileHash -LiteralPath "JetmyV2.exe" -Algorithm SHA256).Hash
-          "$hash *JetmyV2.exe" | Out-File -FilePath "JetmyV2.exe.sha256" -Encoding ascii
+          $hash = (Get-FileHash -LiteralPath "build/JetmyV2.exe" -Algorithm SHA256).Hash
+          "$hash *JetmyV2.exe" | Out-File -FilePath "build/JetmyV2.exe.sha256" -Encoding ascii
           Write-Host "SHA256: $hash"
 
       - name: Calculate Next Version Tag
@@ -171,8 +171,8 @@ jobs:
         with:
           name: JetmyV2-Binary
           path: |
-            JetmyV2.exe
-            JetmyV2.exe.sha256
+            build/JetmyV2.exe
+            build/JetmyV2.exe.sha256
           retention-days: 14
 
       - name: Create GitHub Release
@@ -184,7 +184,7 @@ jobs:
             ## What's Changed
             ${{ steps.changelog.outputs.notes }}
           files: |
-            JetmyV2.exe
-            JetmyV2.exe.sha256
+            build/JetmyV2.exe
+            build/JetmyV2.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -180,7 +180,7 @@ and is disabled when nothing is active.
 
 ## Visual and sound payloads
 
-See **[payloads.md](payloads.md)** for the complete list of all **61 payloads**
+See **[docs/payloads.md](docs/payloads.md)** for the complete list of all **61 payloads**
 and a short description of each: 39 normal visuals, 21 sounds, and one finale.
 
 Visuals include desktop warping, rotation, recursive tunnels, glass shattering,
@@ -207,7 +207,7 @@ fractures, buffer-freeze stutters, corrupted alarms, bit-depth collapse, modem
 hash, PC-speaker storms, feedback howl, accelerating crackles and a rising
 layered rising buzz. Harsh Digital Buzz and Digital Noise Bursts retain the
 earlier noise generators; the former melodic/ambient collection is replaced.
-See [payloads.md](payloads.md#sound-payloads) for the complete list.
+See [docs/payloads.md](docs/payloads.md#sound-payloads) for the complete list.
 
 Sounds are synthesized locally rather than played from song recordings. Normal
 clips use ten-second loops with smoothed boundaries. A continuously queued WinMM
@@ -222,7 +222,7 @@ listening volume; start low. Digital Noise Bursts discards sampled pixel values 
 them into its local LFSR seed; it does not save or transmit desktop images.
 
 For a payload-by-payload performance audit, measured improvements, off-screen
-tests and optional runtime timing traces, see **[performance.md](performance.md)**.
+checks and optional runtime timing traces, see **[docs/performance.md](docs/performance.md)**.
 Rendering preserves the existing sampling quality and uses a bounded CPU worker
 pool for independent pixel work; stacked effects still run in their original order.
 
@@ -306,8 +306,8 @@ g++ --version
 .\compile.cmd
 ```
 
-The script compiles `main.cpp` and the C++ modules in `runtime/`,
-`payloads/visual/`, and `payloads/sound/` into **`JetmyV2.exe`**. It enables
+The script compiles `src/main.cpp` and the C++ modules in `src/runtime/`,
+`src/payloads/visual/`, and `src/payloads/sound/` into **`build/JetmyV2.exe`**. It enables
 optimization, link-time optimization, and static runtime linking. Windows GDI/GDI+,
 User32, WinMM, and Shell32 provide drawing, windowing, audio, and argument parsing.
 Manifest-enabled Windows common controls v6 provide the timed confirmation dialogs.
@@ -320,12 +320,12 @@ point, the old executable is not retained. Build while the simulator is closed.
 After rebuilding, start with the manual panel to inspect the current version:
 
 ```powershell
-.\JetmyV2.exe --menu
+.\build\JetmyV2.exe --menu
 ```
 
-Run the non-interactive startup confirmation/timing tests with
-`.\tests\run_startup_tests.ps1`; see [tests/README.md](tests/README.md).
-These tests do not start effects or audio and can run on physical build machines.
+Build output is kept in the ignored `build/` directory. To inspect the executable's
+PE metadata, install Python's `pefile` package and run
+`python scripts/compatibility_check.py build/JetmyV2.exe` from the repository root.
 
 Legacy-looking XP/Vista/7 presets do **not** guarantee that the executable runs on
 those operating systems. Runtime compatibility depends on the compiler and the
@@ -338,8 +338,8 @@ been established by the availability of those styles.
 | --- | --- |
 | `g++` is not found | Install MinGW-w64, add its `bin` directory to `PATH`, and reopen the terminal. |
 | The build cannot replace the executable | Close the simulator and any process holding the file, then rebuild. Check the compiler output for other errors. |
-| Changes are missing | Run `compile.cmd` and launch the newly built executable from that same folder. Editing source does not update an existing `.exe`. |
-| Timed confirmations cannot be displayed | Rebuild with `windres` available so the common-controls v6 manifest in `version.rc` is embedded. Use Windows 10/11; startup will not bypass the warnings if dialog creation fails. |
+| Changes are missing | Run `compile.cmd` and launch the newly built executable from `build/`. Editing source does not update an existing `.exe`. |
+| Timed confirmations cannot be displayed | Rebuild with `windres` available so the common-controls v6 manifest in `resources/version.rc` is embedded. Use Windows 10/11; startup will not bypass the warnings if dialog creation fails. |
 | No sound | Check the selected output device, application mixer, and speaker volume. In the menu, select a sound again after correcting the device problem. |
 | Visuals are slow | Try fewer simultaneous effects or a lower desktop resolution. Stacked effects increase CPU and memory work. |
 | Screenshots or screen sharing omit effects | Normal preview windows use capture exclusion to avoid capturing themselves recursively. Capture methods may omit or black out excluded windows. |
@@ -357,21 +357,20 @@ like a normal local Windows desktop.
 
 | Path | Purpose |
 | --- | --- |
-| `main.cpp` | Command-line parsing, DPI awareness, entry point, and error reporting. |
-| `runtime/app.cpp` | Automatic/manual coordination, desktop capture, effect stacking, overlay ownership, and cleanup. |
-| `runtime/startup_gate.cpp` | Two default-No confirmations, each with a three-second Yes-button lockout, before simulator initialization. |
-| `runtime/menu.cpp` | Native control panel, scrolling payload lists, toggles, and finale style selection. |
-| `runtime/schedule.h` | Ten-second stages, ten-visual sequence, and audio-selection timing. |
-| `runtime/finale.cpp` | Silent two-second fake freeze, ten-second presentation, input handling, and emergency exits. |
-| `runtime/blue_screen.cpp` | Version detection, classic/modern crash-screen artwork, typography, and QR generation. |
-| `payloads/visual/` | Individual visual implementations, rendering helpers, registry, and popup styling. |
-| `payloads/sound/` | Sound generators, synthesis helpers, registry, loop synthesis, and streaming player. |
-| `payloads.md` | Complete payload catalog with quick summaries. |
-| `compile.cmd` | Modular release build script. |
-| `tests/` | Non-interactive startup verification and test instructions. |
+| `src/main.cpp` | Command-line parsing, DPI awareness, entry point, and error reporting. |
+| `src/runtime/` | Application coordination, startup gate, control panel, rendering, scheduling, and finale. |
+| `src/payloads/visual/` | Individual visual implementations, rendering helpers, registry, and popup styling. |
+| `src/payloads/sound/` | Sound generators, synthesis helpers, registry, loop synthesis, and streaming player. |
+| `resources/version.rc` | Windows manifest and executable version metadata. |
+| `third_party/vmaware.hpp` | Retained third-party header; not used by the current application. |
+| `scripts/` | Distribution installer and Python executable-compatibility utility. |
+| `docs/` | [Payload catalog](docs/payloads.md), [performance audit](docs/performance.md), and [distribution instructions](docs/distribute.md). |
+| `compile.cmd` | Release build entry point; run from the repository root. |
+| `build/` | Generated executable and build artifacts (ignored by Git). |
+| `.github/workflows/` | Build and release automation. |
 
-Normal visuals are registered in `payloads/visual/registry.cpp`; sounds are
-registered in `payloads/sound/registry.cpp`. The blue-screen finale is coordinated
+Normal visuals are registered in `src/payloads/visual/registry.cpp`; sounds are
+registered in `src/payloads/sound/registry.cpp`. The blue-screen finale is coordinated
 separately so it stops all normal payloads and always runs last in automatic mode.
 
 Each registered visual and sound has its own `.cpp` file named after its menu

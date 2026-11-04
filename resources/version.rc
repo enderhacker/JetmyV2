@@ -1,9 +1,9 @@
 #include <windows.h>
 
 // ---------------------------------------------------------------------------
-// 1. Application Icon (optional: place icon.ico in your project folder)
+// 1. Application Icon (optional: place icon.ico in resources/)
 // ---------------------------------------------------------------------------
-// 1 ICON "icon.ico"
+// 1 ICON "resources/icon.ico"
 
 // ---------------------------------------------------------------------------
 // 2. Version Information (Details Tab in File Properties)

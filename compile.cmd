@@ -33,12 +33,13 @@ function Format-Elapsed([TimeSpan]$ts) {
     return "{0:F2}s" -f $ts.TotalSeconds
 }
 
-$Target = "JetmyV2.exe"
+$BuildDirectory = "build"
+$Target = "$BuildDirectory/JetmyV2.exe"
 $SourcePatterns = @(
-    "main.cpp",
-    "runtime/*.cpp",
-    "payloads/visual/*.cpp",
-    "payloads/sound/*.cpp"
+    "src/main.cpp",
+    "src/runtime/*.cpp",
+    "src/payloads/visual/*.cpp",
+    "src/payloads/sound/*.cpp"
 )
 
 # ------------------------------------------------------------------------------
@@ -112,16 +113,16 @@ if (Test-Path -LiteralPath $Target) {
 # ------------------------------------------------------------------------------
 # 3. Collect Source Files (Literal paths to support spaces & brackets)
 # ------------------------------------------------------------------------------
-if (-not (Test-Path -LiteralPath "main.cpp")) {
-    Write-Host "[!] ERROR: Entry point 'main.cpp' not found in current folder." -ForegroundColor Red
+if (-not (Test-Path -LiteralPath "src/main.cpp")) {
+    Write-Host "[!] ERROR: Entry point 'src/main.cpp' not found in repository root." -ForegroundColor Red
     exit 1
 }
 
 $Sources = [System.Collections.Generic.List[string]]::new()
-$Sources.Add("main.cpp")
+$Sources.Add("src/main.cpp")
 
 foreach ($pattern in $SourcePatterns) {
-    if ($pattern -eq "main.cpp") { continue }
+    if ($pattern -eq "src/main.cpp") { continue }
     $files = Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue
     if ($files) {
         foreach ($file in $files) {
@@ -138,7 +139,8 @@ foreach ($pattern in $SourcePatterns) {
 # ------------------------------------------------------------------------------
 $binDir = Split-Path -Parent $gppPath
 $env:PATH = "$binDir;" + $env:PATH
-$resObj = "resources.o"
+New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
+$resObj = "$BuildDirectory/resources.o"
 $specsFile = $null
 
 # Setup MAKE so LTO parallelizes across cores without serial warnings
@@ -164,7 +166,7 @@ try {
         exit 1
     }
 
-    # Omit GCC's default manifest locally: version.rc supplies the application
+    # Omit GCC's default manifest locally: resources/version.rc supplies the application
     # manifest. Never rename files in the compiler installation. This also works
     # when an older build script has already renamed default-manifest.o.
     $specOutput = (& $gppPath '-dumpspecs' 2>&1)
@@ -213,10 +215,10 @@ try {
     # 6. Compile Resource File (.rc) if Present
     # --------------------------------------------------------------------------
     $rcFile = $null
-    if (Test-Path -LiteralPath "version.rc") {
-        $rcFile = "version.rc"
-    } elseif (Test-Path -LiteralPath "resources.rc") {
-        $rcFile = "resources.rc"
+    if (Test-Path -LiteralPath "resources/version.rc") {
+        $rcFile = "resources/version.rc"
+    } elseif (Test-Path -LiteralPath "resources/resources.rc") {
+        $rcFile = "resources/resources.rc"
     }
 
     if ($rcFile) {
@@ -248,7 +250,7 @@ try {
 
         # C++ Standard & Includes
         "-std=c++17"
-        "-I."
+        "-Isrc"
         "-pthread"
         "-DNDEBUG"
         "-specs=$specsFile"

@@ -4,7 +4,8 @@
 
 Measured off-screen at **1920 × 1080**, on an **Intel i5-9600K (6 cores)**,
 using MinGW-w64 GCC 16.2, 32-bit, C++17, `-O3 -ffast-math`, SSE2 and static
-linking. See [tests/README.md](tests/README.md) for reproducible commands.
+linking. The benchmark harness used for these historical measurements is not
+included in the current repository.
 Sixteen sampled phases per effect, identical synthetic input and RNG seeds;
 means exclude the activation frame. Numbers are milliseconds, rounded.
 
@@ -90,7 +91,7 @@ Held state is one color and small metadata per 32-pixel coding tile, bounded by
 screen area. Independent output rows use the existing worker pool; complete
 destination coverage allows frame/scratch buffer exchange. No extra desktop
 capture, GDI calls, audio device, or persistent screenshot history is used.
-`tests/screen_decay.cpp` verifies source immutability, canaries, odd edges,
+The historical Screen Decay checks verified source immutability, canaries, odd edges,
 long-running decay, reset, off-screen displacement, and compression blocks.
 
 ## Every sound payload
@@ -161,7 +162,7 @@ It is off by default and writes **timings only**, not screenshots/audio:
 
 ```powershell
 $env:JETMY_PROFILE_CSV = "$env:LOCALAPPDATA\Temp\jetmy-frame-times.csv"
-.\JetmyV2.exe --menu
+.\build\JetmyV2.exe --menu
 # Select the problematic effects manually, then close normally.
 Remove-Item Env:JETMY_PROFILE_CSV
 ```
