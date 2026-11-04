@@ -6,6 +6,11 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 
 ## Visual payloads
 
+All visual effects share one continuous virtual-desktop canvas across every monitor,
+including mixed resolutions, portrait screens, and negative desktop coordinates.
+Cursor Trail follows the pointer across that canvas; effects are not duplicated
+independently on each monitor. Display-layout changes end the session safely.
+
 | Payload | Quick summary |
 | --- | --- |
 | Random Rectangles | Random architectural panels appear and change across the screen. |

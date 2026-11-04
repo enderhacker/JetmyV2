@@ -11,6 +11,8 @@ void EffectGhostCursorSwarm(float time, float dt) {
     static HCURSOR cursor = LoadCursor(nullptr, IDC_ARROW); // Shared system handle; do not destroy.
     POINT mouse{};
     if (!GetCursorPos(&mouse) || !cursor) return;
+    mouse.x -= g_ScreenLeft;
+    mouse.y -= g_ScreenTop;
     if (!initialized) { trail.fill(mouse); initialized = true; }
     tick += dt;
     if (tick >= 0.025f) { tick = 0; trail[head++ % trail.size()] = mouse; }

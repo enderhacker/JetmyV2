@@ -30,8 +30,11 @@ while the desktop is visually obscured.
 
 ## What it does—and does not do
 
-Normal visual payloads capture the primary desktop into memory and draw modified
-versions in a temporary overlay. They do not permanently change the desktop image.
+Normal visual payloads capture the full virtual desktop into memory and draw modified
+versions in a temporary overlay spanning all monitors. Different resolutions, portrait
+screens, and monitors positioned left of or above the primary display are supported.
+Effects share one continuous canvas, rather than being duplicated per monitor.
+They do not permanently change the desktop image.
 The finale uses a separate presentation window and does not need a desktop capture.
 
 JetmyV2 does **not**:
@@ -344,7 +347,7 @@ been established by the availability of those styles.
 | No sound | Check the selected output device, application mixer, and speaker volume. In the menu, select a sound again after correcting the device problem. |
 | Visuals are slow | Try fewer simultaneous effects or a lower desktop resolution. Stacked effects increase CPU and memory work. |
 | Screenshots or screen sharing omit effects | Normal preview windows use capture exclusion to avoid capturing themselves recursively. Capture methods may omit or black out excluded windows. |
-| Only one monitor has normal effects | Normal desktop effects target the primary monitor. The finale separately covers the virtual desktop and centers its image on the primary monitor. |
+| Effects span multiple monitors | Normal effects share the full virtual-desktop canvas, using each monitor's desktop position and native pixel size. The finale still centers its blue-screen image on the primary monitor and blacks out the others. |
 | The finale differs from a particular Windows screenshot | Presets represent selected historical designs, retain the requested 4:3 presentation, and do not reproduce every OS revision or screen aspect ratio. |
 
 The rendering loop targets roughly 60 frames per second, but that is not a

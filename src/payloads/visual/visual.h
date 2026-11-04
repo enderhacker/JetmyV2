@@ -17,6 +17,8 @@
 namespace VisualPayloads {
 
 extern int g_ScreenWidth, g_ScreenHeight;
+// Desktop-space origin of the zero-based virtual-desktop canvas (may be negative).
+extern int g_ScreenLeft, g_ScreenTop;
 extern HDC g_hMemDC, g_hScratchDC;
 extern uint32_t *g_pFramePixels, *g_pScratchPixels;
 

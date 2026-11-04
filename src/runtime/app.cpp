@@ -89,7 +89,8 @@ public:
         registered_ = true;
         window = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED |
             WS_EX_TRANSPARENT | WS_EX_NOACTIVATE, ClassName, L"Visual Payloads", WS_POPUP,
-            0, 0, width, height, nullptr, nullptr, instance_, nullptr);
+            VisualPayloads::g_ScreenLeft, VisualPayloads::g_ScreenTop,
+            width, height, nullptr, nullptr, instance_, nullptr);
         if (!window) throw std::runtime_error("Cannot create overlay window.");
         if (!SetWindowDisplayAffinity(window, WDA_EXCLUDEFROMCAPTURE))
             throw std::runtime_error("Cannot exclude overlay from screen capture.");
@@ -104,7 +105,9 @@ public:
             SetWindowRgn(window, nullptr, TRUE);
         } else {
             HRGN region = CreateRectRgn(0, 0, VisualPayloads::g_ScreenWidth, VisualPayloads::g_ScreenHeight);
-            HRGN hole = CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
+            RECT local = rect;
+            OffsetRect(&local, -VisualPayloads::g_ScreenLeft, -VisualPayloads::g_ScreenTop);
+            HRGN hole = CreateRectRgn(local.left, local.top, local.right, local.bottom);
             bool valid = region && hole && CombineRgn(region, region, hole, RGN_DIFF) != ERROR;
             if (hole) DeleteObject(hole);
             if (!valid || !SetWindowRgn(window, region, TRUE)) {
@@ -133,8 +136,9 @@ void DrawCapturedCursor(HDC dc) {
     if (!GetCursorInfo(&cursor) || !(cursor.flags & CURSOR_SHOWING) || !cursor.hCursor) return;
     ICONINFO icon{};
     if (!GetIconInfo(cursor.hCursor, &icon)) return;
-    DrawIconEx(dc, cursor.ptScreenPos.x - static_cast<int>(icon.xHotspot),
-        cursor.ptScreenPos.y - static_cast<int>(icon.yHotspot), cursor.hCursor, 0, 0, 0, nullptr, DI_NORMAL);
+    DrawIconEx(dc, cursor.ptScreenPos.x - VisualPayloads::g_ScreenLeft - static_cast<int>(icon.xHotspot),
+        cursor.ptScreenPos.y - VisualPayloads::g_ScreenTop - static_cast<int>(icon.yHotspot),
+        cursor.hCursor, 0, 0, 0, nullptr, DI_NORMAL);
     if (icon.hbmMask) DeleteObject(icon.hbmMask);
     if (icon.hbmColor) DeleteObject(icon.hbmColor);
     GdiFlush();
@@ -143,8 +147,10 @@ void DrawCapturedCursor(HDC dc) {
 int Run(HINSTANCE instance, bool menuMode) {
     using namespace VisualPayloads;
     using Clock = std::chrono::steady_clock;
-    g_ScreenWidth = GetSystemMetrics(SM_CXSCREEN);
-    g_ScreenHeight = GetSystemMetrics(SM_CYSCREEN);
+    g_ScreenLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    g_ScreenTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    g_ScreenWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    g_ScreenHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
     if (g_ScreenWidth <= 0 || g_ScreenHeight <= 0) throw std::runtime_error("Invalid screen dimensions.");
     const size_t totalBytes = static_cast<size_t>(g_ScreenWidth) * g_ScreenHeight * sizeof(uint32_t);
     Runtime::FrameProfiler profiler(g_ScreenWidth, g_ScreenHeight);
@@ -185,7 +191,8 @@ int Run(HINSTANCE instance, bool menuMode) {
     float echoTick = 0;
     bool historyReady = false;
     bool shown = false;
-    POINT origin = {0, 0};
+    POINT destination = {g_ScreenLeft, g_ScreenTop};
+    POINT source = {0, 0};
     SIZE size = {g_ScreenWidth, g_ScreenHeight};
     bool captureUnavailable = false;
     BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, 0};
@@ -265,7 +272,11 @@ int Run(HINSTANCE instance, bool menuMode) {
         const bool profileFrame = profiler.Enabled();
         auto captureStart = profileFrame ? Clock::now() : Clock::time_point{};
         HDC desktop = GetDC(nullptr);
-        BOOL captured = desktop && BitBlt(base.dc, 0, 0, g_ScreenWidth, g_ScreenHeight, desktop, 0, 0, SRCCOPY);
+        // Unequal monitor sizes/layouts can leave gaps inside the bounding rectangle.
+        // Keep those canvas pixels deterministic instead of retaining old image data.
+        PatBlt(base.dc, 0, 0, g_ScreenWidth, g_ScreenHeight, BLACKNESS);
+        BOOL captured = desktop && BitBlt(base.dc, 0, 0, g_ScreenWidth, g_ScreenHeight,
+            desktop, g_ScreenLeft, g_ScreenTop, SRCCOPY);
         if (desktop) ReleaseDC(nullptr, desktop);
         if (!captured) {
             if (!captureUnavailable) OutputDebugStringA("Desktop capture temporarily unavailable; hiding visuals and retrying.\n");
@@ -318,7 +329,7 @@ int Run(HINSTANCE instance, bool menuMode) {
             if (profileFrame) profiler.Record(stage, payload.name, payloadStart);
         }
         auto presentStart = profileFrame ? Clock::now() : Clock::time_point{};
-        if (!UpdateLayeredWindow(overlay.window, nullptr, &origin, &size, g_hMemDC, &origin, 0, &blend, ULW_ALPHA))
+        if (!UpdateLayeredWindow(overlay.window, nullptr, &destination, &size, g_hMemDC, &source, 0, &blend, ULW_ALPHA))
             throw std::runtime_error("Cannot present overlay frame.");
         if (!shown) { ShowWindow(overlay.window, SW_SHOWNOACTIVATE); shown = true; }
         if (profileFrame) {

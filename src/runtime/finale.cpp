@@ -65,8 +65,8 @@ public:
         // The normal overlay is capture-excluded. Composite its last frame explicitly
         // so the freeze preserves the active effects without weakening that protection.
         if (captured && frozenVisual) {
-            BitBlt(frozenCanvas, -GetSystemMetrics(SM_XVIRTUALSCREEN), -GetSystemMetrics(SM_YVIRTUALSCREEN),
-                GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), frozenVisual, 0, 0, SRCCOPY);
+            BitBlt(frozenCanvas, 0, 0,
+                GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN), frozenVisual, 0, 0, SRCCOPY);
         }
         CURSORINFO cursorInfo{};
         cursorInfo.cbSize = sizeof(cursorInfo);

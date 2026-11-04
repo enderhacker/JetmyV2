@@ -2,6 +2,7 @@
 
 namespace VisualPayloads {
 int g_ScreenWidth = 0, g_ScreenHeight = 0;
+int g_ScreenLeft = 0, g_ScreenTop = 0;
 HDC g_hMemDC = nullptr, g_hScratchDC = nullptr;
 uint32_t *g_pFramePixels = nullptr, *g_pScratchPixels = nullptr;
 std::vector<EchoFrame> g_EchoHistory;
