@@ -125,7 +125,8 @@ The temporary capture for Digital Noise Bursts is released immediately after mix
 16 sampled values into its seed. It neither saves nor transmits the image.
 PCM limits, generators, loop seams, crossfades, and device ownership are unchanged.
 The separate blue-screen finale is not part of these payload timings; its artwork
-and error-tone behavior were not modified.
+and input behavior were not modified by that optimization pass. The finale now
+uses a silent two-second fake freeze followed by a silent blue screen.
 
 ## Shared renderer changes and visual preservation
 

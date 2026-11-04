@@ -1,52 +1,13 @@
 #include "finale.h"
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <cwchar>
-#include <mmsystem.h>
 #include <stdexcept>
-#include <vector>
 
 namespace Runtime {
 namespace {
 constexpr wchar_t FinaleClass[] = L"JetmySimulatedBlueScreen";
-class ErrorTone {
-    HWAVEOUT device_ = nullptr;
-    WAVEHDR header_{};
-    std::vector<int16_t> samples_;
-    bool prepared_ = false;
-public:
-    ~ErrorTone() {
-        if (!device_) return;
-        waveOutReset(device_);
-        if (prepared_) waveOutUnprepareHeader(device_, &header_, sizeof(header_));
-        waveOutClose(device_);
-    }
-    void Prepare() {
-        constexpr unsigned rate = 8000;
-        samples_.resize(rate * FinaleSeconds);
-        for (size_t i = 0; i < samples_.size(); ++i) {
-            // A single steady 800 Hz tone, with only 5 ms edge ramps to avoid clicks.
-            float envelope = std::min({1.0f, float(i) / 40, float(samples_.size() - 1 - i) / 40});
-            samples_[i] = static_cast<int16_t>(3500 * envelope * std::sin(6.28318530718 * 800 * i / rate));
-        }
-        WAVEFORMATEX format{};
-        format.wFormatTag = WAVE_FORMAT_PCM;
-        format.nChannels = 1; format.nSamplesPerSec = rate; format.wBitsPerSample = 16;
-        format.nBlockAlign = 2; format.nAvgBytesPerSec = rate * 2;
-        if (waveOutOpen(&device_, WAVE_MAPPER, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) {
-            device_ = nullptr; return;
-        }
-        header_.lpData = reinterpret_cast<LPSTR>(samples_.data());
-        header_.dwBufferLength = static_cast<DWORD>(samples_.size() * sizeof(int16_t));
-        prepared_ = waveOutPrepareHeader(device_, &header_, sizeof(header_)) == MMSYSERR_NOERROR;
-    }
-    void Start() {
-        if (!prepared_ || waveOutWrite(device_, &header_, sizeof(header_)) != MMSYSERR_NOERROR)
-            OutputDebugStringA("Finale tone unavailable; continuing blue-screen presentation silently.\n");
-    }
-};
 class BlueScreen {
 public:
     HINSTANCE instance;
@@ -55,6 +16,10 @@ public:
     HDC canvas = nullptr;
     HBITMAP bitmap = nullptr;
     HGDIOBJ previousBitmap = nullptr;
+    HDC frozenCanvas = nullptr;
+    HBITMAP frozenBitmap = nullptr;
+    HGDIOBJ previousFrozenBitmap = nullptr;
+    bool frozen = true;
     BlueScreenArtwork artwork;
     bool registered = false, dismissed = false;
     int progress = -1;
@@ -68,6 +33,9 @@ public:
         if (canvas && previousBitmap) SelectObject(canvas, previousBitmap);
         if (bitmap) DeleteObject(bitmap);
         if (canvas) DeleteDC(canvas);
+        if (frozenCanvas && previousFrozenBitmap) SelectObject(frozenCanvas, previousFrozenBitmap);
+        if (frozenBitmap) DeleteObject(frozenBitmap);
+        if (frozenCanvas) DeleteDC(frozenCanvas);
         if (registered) UnregisterClassW(FinaleClass, instance);
         // Cursor visibility was only changed by WM_SETCURSOR, never ShowCursor.
         POINT cursor{};
@@ -77,6 +45,30 @@ public:
         }
     }
     void Create() {
+        // Capture once before showing our window. Windows and other apps keep running.
+        HDC desktop = GetDC(nullptr);
+        if (!desktop) throw std::runtime_error("Cannot capture frozen desktop.");
+        frozenCanvas = CreateCompatibleDC(desktop);
+        frozenBitmap = CreateCompatibleBitmap(desktop, GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+        if (frozenCanvas && frozenBitmap) previousFrozenBitmap = SelectObject(frozenCanvas, frozenBitmap);
+        bool captured = previousFrozenBitmap && previousFrozenBitmap != HGDI_ERROR &&
+            BitBlt(frozenCanvas, 0, 0, GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN),
+                desktop, GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN), SRCCOPY | CAPTUREBLT);
+        ReleaseDC(nullptr, desktop);
+        if (previousFrozenBitmap == HGDI_ERROR) previousFrozenBitmap = nullptr;
+        if (!captured) throw std::runtime_error("Cannot capture frozen desktop.");
+        CURSORINFO cursorInfo{};
+        cursorInfo.cbSize = sizeof(cursorInfo);
+        if (GetCursorInfo(&cursorInfo) && (cursorInfo.flags & CURSOR_SHOWING)) {
+            ICONINFO icon{};
+            if (GetIconInfo(cursorInfo.hCursor, &icon)) {
+                DrawIconEx(frozenCanvas, cursorInfo.ptScreenPos.x - GetSystemMetrics(SM_XVIRTUALSCREEN) - icon.xHotspot,
+                    cursorInfo.ptScreenPos.y - GetSystemMetrics(SM_YVIRTUALSCREEN) - icon.yHotspot,
+                    cursorInfo.hCursor, 0, 0, 0, nullptr, DI_NORMAL);
+                if (icon.hbmMask) DeleteObject(icon.hbmMask);
+                if (icon.hbmColor) DeleteObject(icon.hbmColor);
+            }
+        }
         canvas = CreateCompatibleDC(nullptr);
         if (!canvas) throw std::runtime_error("Cannot create blue-screen canvas.");
         BITMAPINFO info{};
@@ -135,6 +127,11 @@ public:
     void Paint() {
         PAINTSTRUCT paint{}; HDC dc = BeginPaint(window, &paint);
         RECT client{}; GetClientRect(window, &client);
+        if (frozen) {
+            BitBlt(dc, 0, 0, client.right, client.bottom, frozenCanvas, 0, 0, SRCCOPY);
+            EndPaint(window, &paint);
+            return;
+        }
         RECT image = ImageRect();
         // Paint letterboxing only: never flash black underneath the blue image.
         RECT bars[] = {{client.left, client.top, client.right, image.top},
@@ -175,13 +172,11 @@ public:
 bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& shouldExit, BlueScreenStyle style) {
     using Clock = std::chrono::steady_clock;
     BlueScreen screen(instance, style);
-    ErrorTone tone;
-    tone.Prepare(); // Allocate/open audio before the visible ten-second countdown.
     screen.Create();
-    const auto start = screen.presentedAt;
+    auto start = screen.presentedAt;
+    const auto freezeDeadline = start + std::chrono::seconds(2);
     const auto duration = std::chrono::seconds(FinaleSeconds);
-    const auto deadline = start + duration;
-    tone.Start(); // Nonblocking playback; emergency exits remain responsive.
+    auto deadline = freezeDeadline + duration;
     while (!screen.dismissed && !shouldExit()) {
         MSG msg{};
         for (int processed = 0; processed < 64 && PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE); ++processed) {
@@ -190,6 +185,17 @@ bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& should
         }
         if (screen.dismissed || shouldExit()) return false;
         const auto now = Clock::now();
+        if (screen.frozen) {
+            if (now >= freezeDeadline) {
+                screen.frozen = false;
+                InvalidateRect(screen.window, nullptr, FALSE);
+                UpdateWindow(screen.window);
+                start = Clock::now();
+                deadline = start + duration;
+            }
+            MsgWaitForMultipleObjectsEx(0, nullptr, 10, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            continue;
+        }
         if (now >= deadline) return true;
         auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
         screen.Render(std::min(99, int(elapsedMs * 100 / (FinaleSeconds * 1000))));

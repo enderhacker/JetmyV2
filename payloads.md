@@ -47,8 +47,8 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 
 **Simulated Blue Screen:** always follows the automatic 100-second show, or runs
 from the menu's **Blue screen (10s)** button. Stops all visuals and audio, then
-shows a centered 4:3 version-specific crash screen for 10 seconds with a continuous 800 Hz
-error tone at bounded amplitude and black surrounding
+first simulates a silent two-second desktop freeze across all monitors, then
+shows a silent centered 4:3 version-specific crash screen for 10 seconds with black surrounding
 space and the cursor hidden over the presentation. Other monitors are blacked out.
 Artwork uses a native-resolution canvas, antialiased outline fonts and whole-pixel
 QR modules, without upscaling low-resolution screenshots or changing system settings.

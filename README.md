@@ -81,7 +81,7 @@ During the blue-screen finale, **Escape** also exits early.
 ## Automatic show
 
 A normal launch runs a **100-second effects sequence**, followed by the
-**10-second blue-screen finale**: approximately **110 seconds total**, excluding
+**two-second silent fake freeze and 10-second blue-screen finale**: approximately **112 seconds total**, excluding
 initialization and cleanup.
 
 The show chooses ten distinct visual payloads in a shuffled order. It starts one
@@ -100,8 +100,9 @@ active, so the image becomes progressively more layered.
 | 70 seconds | Add visual #8. | Keep the current sound. |
 | 80 seconds | Add visual #9. | Switch to a different random sound. |
 | 90 seconds | Add visual #10. | Keep the current sound. |
-| 100 seconds | Stop every normal payload; start the blue-screen finale. | Replace the looping sound with a steady error tone. |
-| 110 seconds | Close the finale and exit. | Stop the error tone. |
+| 100 seconds | Stop every normal payload; fake-freeze the entire desktop for two seconds. | Stop audio. |
+| 102 seconds | Show the blue-screen finale. | Silent. |
+| 112 seconds | Close the finale and exit. | Silent. |
 
 Sound changes never intentionally choose the immediately previous sound. A short
 crossfade connects selections without an intentional silent stage. A sound may
@@ -245,8 +246,8 @@ every Windows build, localization, or hardware configuration.
   Progress is derived from elapsed time rather than counting animation frames.
 - Only the progress region is refreshed as the number changes; the blue image is
   not cleared to black between updates.
-- One continuous **800 Hz error tone** plays at bounded amplitude, with brief
-  start/end ramps to avoid clicks. It stops when the finale ends or is dismissed.
+- A static snapshot across all monitors simulates a two-second freeze before the
+  blue screen. Both phases are silent; other applications keep running normally.
 - The cursor is hidden while it is over the presentation window.
 - Clicks and ordinary keyboard input are consumed while that window has focus.
 - Input is **not globally locked**. Windows system shortcuts remain available;
@@ -256,7 +257,7 @@ every Windows build, localization, or hardware configuration.
 
 After normal completion, automatic mode exits. Manual mode returns to the panel
 with all effects and audio off. The presentation window is removed, its cursor
-handling ends, and the error tone stops.
+handling ends, and the frozen snapshot is released.
 
 ## Stopping and cleanup
 
@@ -336,7 +337,7 @@ like a normal local Windows desktop.
 | `runtime/app.cpp` | Automatic/manual coordination, desktop capture, effect stacking, overlay ownership, and cleanup. |
 | `runtime/menu.cpp` | Native control panel, scrolling payload lists, toggles, and finale style selection. |
 | `runtime/schedule.h` | Ten-second stages, ten-visual sequence, and audio-selection timing. |
-| `runtime/finale.cpp` | Ten-second presentation lifecycle, steady error tone, input handling, and emergency exits. |
+| `runtime/finale.cpp` | Silent two-second fake freeze, ten-second presentation, input handling, and emergency exits. |
 | `runtime/blue_screen.cpp` | Version detection, classic/modern crash-screen artwork, typography, and QR generation. |
 | `payloads/visual/` | Individual visual implementations, rendering helpers, registry, and popup styling. |
 | `payloads/sound/` | Sound generators, synthesis helpers, registry, loop synthesis, and streaming player. |
