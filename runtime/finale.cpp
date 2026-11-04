@@ -47,19 +47,24 @@ public:
     void Create() {
         // Capture once before showing our window. Windows and other apps keep running.
         HDC desktop = GetDC(nullptr);
-        if (!desktop) throw std::runtime_error("Cannot capture frozen desktop.");
-        frozenCanvas = CreateCompatibleDC(desktop);
-        frozenBitmap = CreateCompatibleBitmap(desktop, GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+        if (desktop) {
+            frozenCanvas = CreateCompatibleDC(desktop);
+            frozenBitmap = CreateCompatibleBitmap(desktop, GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+        }
         if (frozenCanvas && frozenBitmap) previousFrozenBitmap = SelectObject(frozenCanvas, frozenBitmap);
         bool captured = previousFrozenBitmap && previousFrozenBitmap != HGDI_ERROR &&
             BitBlt(frozenCanvas, 0, 0, GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN),
                 desktop, GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN), SRCCOPY | CAPTUREBLT);
-        ReleaseDC(nullptr, desktop);
+        if (desktop) ReleaseDC(nullptr, desktop);
         if (previousFrozenBitmap == HGDI_ERROR) previousFrozenBitmap = nullptr;
-        if (!captured) throw std::runtime_error("Cannot capture frozen desktop.");
+        if (!captured) {
+            // A locked/secure desktop may reject capture. Never display uninitialized pixels.
+            frozen = false;
+            OutputDebugStringA("Frozen desktop capture unavailable; skipping freeze and showing silent blue screen.\n");
+        }
         CURSORINFO cursorInfo{};
         cursorInfo.cbSize = sizeof(cursorInfo);
-        if (GetCursorInfo(&cursorInfo) && (cursorInfo.flags & CURSOR_SHOWING)) {
+        if (captured && GetCursorInfo(&cursorInfo) && (cursorInfo.flags & CURSOR_SHOWING)) {
             ICONINFO icon{};
             if (GetIconInfo(cursorInfo.hCursor, &icon)) {
                 DrawIconEx(frozenCanvas, cursorInfo.ptScreenPos.x - GetSystemMetrics(SM_XVIRTUALSCREEN) - icon.xHotspot,
@@ -176,7 +181,7 @@ bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& should
     auto start = screen.presentedAt;
     const auto freezeDeadline = start + std::chrono::seconds(2);
     const auto duration = std::chrono::seconds(FinaleSeconds);
-    auto deadline = freezeDeadline + duration;
+    auto deadline = (screen.frozen ? freezeDeadline : start) + duration;
     while (!screen.dismissed && !shouldExit()) {
         MSG msg{};
         for (int processed = 0; processed < 64 && PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE); ++processed) {

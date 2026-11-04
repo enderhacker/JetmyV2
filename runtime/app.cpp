@@ -186,6 +186,7 @@ int Run(HINSTANCE instance, bool menuMode) {
     bool shown = false;
     POINT origin = {0, 0};
     SIZE size = {g_ScreenWidth, g_ScreenHeight};
+    bool captureUnavailable = false;
     BLENDFUNCTION blend = {AC_SRC_OVER, 0, 255, 0};
 
     while (running) {
@@ -266,10 +267,19 @@ int Run(HINSTANCE instance, bool menuMode) {
         const bool profileFrame = profiler.Enabled();
         auto captureStart = profileFrame ? Clock::now() : Clock::time_point{};
         HDC desktop = GetDC(nullptr);
-        if (!desktop) throw std::runtime_error("Cannot capture desktop.");
-        BOOL captured = BitBlt(base.dc, 0, 0, g_ScreenWidth, g_ScreenHeight, desktop, 0, 0, SRCCOPY);
-        ReleaseDC(nullptr, desktop);
-        if (!captured) throw std::runtime_error("Desktop capture failed.");
+        BOOL captured = desktop && BitBlt(base.dc, 0, 0, g_ScreenWidth, g_ScreenHeight, desktop, 0, 0, SRCCOPY);
+        if (desktop) ReleaseDC(nullptr, desktop);
+        if (!captured) {
+            if (!captureUnavailable) OutputDebugStringA("Desktop capture temporarily unavailable; hiding visuals and retrying.\n");
+            captureUnavailable = true;
+            if (shown) { ShowWindow(overlay.window, SW_HIDE); shown = false; }
+            historyReady = false; echoTick = 0; g_EchoHead = 0;
+            // Never render partially captured pixels. Pump messages/exits between retries.
+            MsgWaitForMultipleObjectsEx(0, nullptr, 100, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            continue;
+        }
+        if (captureUnavailable) OutputDebugStringA("Desktop capture recovered.\n");
+        captureUnavailable = false;
         GdiFlush(); // Synchronize GDI writes before accessing DIB memory.
         if (!needsEcho) { historyReady = false; echoTick = 0; g_EchoHead = 0; }
         else echoTick += dt;

@@ -248,6 +248,8 @@ every Windows build, localization, or hardware configuration.
   not cleared to black between updates.
 - A static snapshot across all monitors simulates a two-second freeze before the
   blue screen. Both phases are silent; other applications keep running normally.
+  If Windows rejects the snapshot, the freeze is skipped rather than showing an
+  invalid image or closing with a capture error.
 - The cursor is hidden while it is over the presentation window.
 - Clicks and ordinary keyboard input are consumed while that window has focus.
 - Input is **not globally locked**. Windows system shortcuts remain available;
