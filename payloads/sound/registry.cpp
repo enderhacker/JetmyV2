@@ -20,7 +20,10 @@ const std::vector<PayloadRecord>& Registry() {
         {"Clashing Tones", RingModTritoneClash},
         {"Grinding Digital Noise", BytebeatVoidEngine},
         {"Glitchy Noise Bursts", MemoryBusGlitch},
-        {"Whistling Noise", CombFilterScreamer}
+        {"Whistling Noise", CombFilterScreamer},
+        {"Broken Vowel", BrokenVowel},
+        {"Ratchet Crash", RatchetCrash},
+        {"Reverse Shrapnel", ReverseShrapnel}
     };
     return payloads;
 }

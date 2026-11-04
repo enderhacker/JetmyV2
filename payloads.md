@@ -1,6 +1,6 @@
 # Payloads
 
-All 53 payloads: 34 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
+All 61 payloads: 39 visual effects, one finale and 21 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -42,6 +42,11 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Zooming Screen Glitch | Expands its previous overlay frame by approximately 101–102% per nominal frame, combining XOR and brightened difference feedback with a periodic desktop-refresh sweep. |
 | Flashing Brightness Bands | Cycles luminance bit-planes from bit 7 to bit 0 as monochrome and neon binary contours, with brief frame-visible inverted flashes. |
 | Screen Decay | Slowly drifts the captured screen slightly off the edges, increases blockiness and color loss, stalls coding tiles and tears strips, then builds dark red/orange heat distortion over 35 seconds. Stays corrupted and animated until disabled; restarting resets the decay. All damage and low-bitrate artifacts are simulated. |
+| Paper Accordion | Alternating mirrored desktop pleats breathe in depth, with shaded back faces and red creases. |
+| Zipper Rift | A moving zipper pulls the desktop apart along a curved seam, exposing a dark red checkerboard with interlocking teeth. |
+| Error Barcode | The desktop becomes a shifting, variable-height machine barcode beneath a sweeping red scanner beam. |
+| Circuit Etching | Etches the desktop into green diagonal circuit traces and copper nodes, with traveling voltage pulses. |
+| ASCII Corruption | Reconstructs desktop luminance as a crisp bitmap-glyph terminal, interrupted by crawling red corruption cells. |
 
 ## Finale
 
@@ -88,6 +93,9 @@ page. The Windows 11 preset intentionally does not use its newer black design.
 | Grinding Digital Noise | Grinding unsigned shift/multiply formula produces mechanical chugs and digital squeals; variable shift counts wrap modulo 32. |
 | Glitchy Noise Bursts | Synthetic register-like patterns become pseudo-PCM squeals and packet bursts; no actual memory/register access. |
 | Whistling Noise | Noise feeds a bounded, swept fractional-delay feedback comb with approximately 1–3.6 kHz fundamental resonances. |
+| Broken Vowel | Raspy synthetic glottal pulses excite two wandering formant-like tones, producing a crushed, inhuman vowel. |
+| Ratchet Crash | Accelerating impact envelopes strike a descending-cycle metallic carrier and sharp noise, like a failing mechanical ratchet. |
+| Reverse Shrapnel | Repeated reverse-envelope noise swells and falling ring-modulated chirps build to abrupt cutoffs. |
 
 The new visuals contain intense motion and flashing; all sounds are intentionally
 harsh. Start with low system volume. The 8 kHz mono stream cannot reproduce tones

@@ -60,6 +60,9 @@ float RingModTritoneClash(uint32_t, Voice&);
 float BytebeatVoidEngine(uint32_t, Voice&);
 float MemoryBusGlitch(uint32_t, Voice&);
 float CombFilterScreamer(uint32_t, Voice&);
+float BrokenVowel(uint32_t, Voice&);
+float RatchetCrash(uint32_t, Voice&);
+float ReverseShrapnel(uint32_t, Voice&);
 std::vector<int16_t> Synthesize(Generator generator, unsigned seconds, std::mt19937& random, bool loop = false);
 
 // A single continuously queued output stream; selection changes crossfade inside it.

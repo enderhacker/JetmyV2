@@ -5,7 +5,7 @@ appearance of a chaotic desktop with screen distortions, animations, simulated
 system messages, and synthesized audio. It is a visual demo, not a tool that
 infects or damages your computer.
 
-The project includes **34 visual effects**, **18 sound payloads**, and a separate
+The project includes **39 visual effects**, **21 sound payloads**, and a separate
 **10-second simulated blue-screen finale**. You can run an automatic show or use
 the manual control panel to preview effects independently.
 
@@ -60,9 +60,9 @@ needed for sound, but the visual show can continue if audio is unavailable.
 
 Both automatic and manual modes require **two explicit confirmations** before
 initializing capture, overlays, or audio. In **each** dialog, **Yes is disabled for
-the first three seconds**, with a countdown showing the remaining wait. Each
+the first three seconds**. The compact dialogs have no countdown footer or step labels. Each
 dialog defaults to **No**; No, Escape, or closing the dialog exits immediately,
-including during the countdown. Approval is not saved between launches.
+including during the wait. Approval is not saved between launches.
 
 There is no automatic VM detection or VM-only restriction. The startup gate does
 not probe hardware, registry keys, network adapters, or Windows installation age.
@@ -180,8 +180,8 @@ and is disabled when nothing is active.
 
 ## Visual and sound payloads
 
-See **[payloads.md](payloads.md)** for the complete list of all **53 payloads**
-and a short description of each: 34 normal visuals, 18 sounds, and one finale.
+See **[payloads.md](payloads.md)** for the complete list of all **61 payloads**
+and a short description of each: 39 normal visuals, 21 sounds, and one finale.
 
 Visuals include desktop warping, rotation, recursive tunnels, glass shattering,
 melting, persistent paint trails, pixel sorting, fractals, status icons, and simulated
@@ -202,7 +202,7 @@ adds blocky low-bitrate-style artifacts, stalled tiles and torn strips, then
 darkens it with red/orange heat distortion over 35 seconds. This damage is
 entirely simulated; no applications, files, or display settings are changed.
 
-The 18 sounds are deliberately abrasive glitch/noise simulations: bytebeat
+The 21 sounds are deliberately abrasive glitch/noise simulations: bytebeat
 fractures, buffer-freeze stutters, corrupted alarms, bit-depth collapse, modem
 hash, PC-speaker storms, feedback howl, accelerating crackles and a rising
 layered rising buzz. Harsh Digital Buzz and Digital Noise Bursts retain the
