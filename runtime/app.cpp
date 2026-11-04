@@ -202,26 +202,23 @@ int Run(HINSTANCE instance, bool menuMode) {
         int stage = Runtime::StageAt(now - start);
         if ((!menuMode && stage >= Runtime::VisualCount) || controls.finaleRequested) {
             controls.finaleRequested = false;
-            std::fill(controls.visuals.begin(), controls.visuals.end(), false);
-            std::fill(wasEnabled.begin(), wasEnabled.end(), false);
-            controls.audio = -1; ++controls.audioRevision;
-            audioRevision = controls.audioRevision;
+            // Mute before the freeze, but preserve the active visual frame/state
+            // until the blue screen has actually been painted.
             sound.Stop();
-            ShowWindow(overlay.window, SW_HIDE); shown = false;
             if (menuMode) {
-                menu.SetPreviewActive(false); menu.Refresh();
                 ShowWindow(menu.Window(), SW_HIDE);
             }
-            bool completed = Runtime::RunBlueScreenFinale(instance, [&] {
+            Runtime::RunBlueScreenFinale(instance, [&] {
                 return !running || controls.closing || ExitRequested();
-            }, controls.finaleStyle);
-            if (!menuMode || !completed || !running || controls.closing || ExitRequested()) break;
-            historyReady = false; echoTick = 0; g_EchoHead = 0;
-            lastFrame = Clock::now();
-            ShowWindow(menu.Window(), SW_SHOW);
-            SetForegroundWindow(menu.Window());
-            menu.Refresh();
-            continue;
+            }, controls.finaleStyle, [&] {
+                std::fill(controls.visuals.begin(), controls.visuals.end(), false);
+                std::fill(wasEnabled.begin(), wasEnabled.end(), false);
+                controls.audio = -1; ++controls.audioRevision;
+                audioRevision = controls.audioRevision;
+                ShowWindow(overlay.window, SW_HIDE); shown = false;
+                if (menuMode) { menu.SetPreviewActive(false); menu.Refresh(); }
+            }, shown ? g_hMemDC : nullptr);
+            break;
         }
         float dt = std::chrono::duration<float>(now - lastFrame).count();
         lastFrame = now;

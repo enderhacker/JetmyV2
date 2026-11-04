@@ -48,11 +48,14 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 **Simulated Blue Screen:** always follows the automatic 100-second show, or runs
 from the menu's **Blue screen (10s)** button. Stops all visuals and audio, then
 first simulates a silent two-second desktop freeze across all monitors, then
-shows a silent centered 4:3 version-specific crash screen for 10 seconds with black surrounding
+shows a silent centered 4:3 version-specific crash screen with black surrounding
 space and the cursor hidden over the presentation. Other monitors are blacked out.
 Artwork uses a native-resolution canvas, antialiased outline fonts and whole-pixel
 QR modules, without upscaling low-resolution screenshots or changing system settings.
-Afterward, automatic mode exits; manual mode returns with all payloads off.
+The freeze preserves the last visible effects; payload selections are cleared only
+after the blue screen is painted (audio is muted before the freeze). Progress rises
+to 99% over approximately ten seconds, holds for three seconds, then shows 0% for
+250 ms before the entire app exits in both automatic and manual modes.
 No crash, reboot, memory dump, display-mode change or global input lock occurs.
 Ordinary input is consumed only while its window has focus. Escape and emergency
 shortcuts can exit early; system shortcuts remain available.

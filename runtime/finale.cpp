@@ -44,7 +44,7 @@ public:
             if (target) PostMessageW(target, WM_SETCURSOR, reinterpret_cast<WPARAM>(target), MAKELPARAM(HTCLIENT, WM_MOUSEMOVE));
         }
     }
-    void Create() {
+    void Create(HDC frozenVisual) {
         // Capture once before showing our window. Windows and other apps keep running.
         HDC desktop = GetDC(nullptr);
         if (desktop) {
@@ -61,6 +61,12 @@ public:
             // A locked/secure desktop may reject capture. Never display uninitialized pixels.
             frozen = false;
             OutputDebugStringA("Frozen desktop capture unavailable; skipping freeze and showing silent blue screen.\n");
+        }
+        // The normal overlay is capture-excluded. Composite its last frame explicitly
+        // so the freeze preserves the active effects without weakening that protection.
+        if (captured && frozenVisual) {
+            BitBlt(frozenCanvas, -GetSystemMetrics(SM_XVIRTUALSCREEN), -GetSystemMetrics(SM_YVIRTUALSCREEN),
+                GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), frozenVisual, 0, 0, SRCCOPY);
         }
         CURSORINFO cursorInfo{};
         cursorInfo.cbSize = sizeof(cursorInfo);
@@ -174,14 +180,17 @@ public:
 };
 }
 
-bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& shouldExit, BlueScreenStyle style) {
+bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& shouldExit, BlueScreenStyle style,
+    const std::function<void()>& onPresented, HDC frozenVisual) {
     using Clock = std::chrono::steady_clock;
     BlueScreen screen(instance, style);
-    screen.Create();
+    screen.Create(frozenVisual);
+    if (!screen.frozen && onPresented) onPresented();
     auto start = screen.presentedAt;
     const auto freezeDeadline = start + std::chrono::seconds(2);
     const auto duration = std::chrono::seconds(FinaleSeconds);
     auto deadline = (screen.frozen ? freezeDeadline : start) + duration;
+    bool holding = false, resetting = false;
     while (!screen.dismissed && !shouldExit()) {
         MSG msg{};
         for (int processed = 0; processed < 64 && PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE); ++processed) {
@@ -195,15 +204,29 @@ bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& should
                 screen.frozen = false;
                 InvalidateRect(screen.window, nullptr, FALSE);
                 UpdateWindow(screen.window);
+                if (onPresented) onPresented();
                 start = Clock::now();
                 deadline = start + duration;
             }
             MsgWaitForMultipleObjectsEx(0, nullptr, 10, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
             continue;
         }
-        if (now >= deadline) return true;
+        if (resetting && now >= deadline) return true;
         auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
-        screen.Render(std::min(99, int(elapsedMs * 100 / (FinaleSeconds * 1000))));
+        int percent = std::min(99, int(elapsedMs * 100 / (FinaleSeconds * 1000)));
+        if (!holding && !resetting) {
+            screen.Render(percent);
+            if (percent == 99) {
+                UpdateWindow(screen.window);
+                holding = true;
+                deadline = Clock::now() + std::chrono::seconds(3);
+            }
+        } else if (holding && now >= deadline) {
+            screen.Render(0);
+            UpdateWindow(screen.window);
+            holding = false; resetting = true;
+            deadline = Clock::now() + std::chrono::milliseconds(250);
+        }
         // Keep pumping messages and checking emergency exits; never sleep for ten seconds.
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now()).count();
         DWORD wait = static_cast<DWORD>(std::clamp<long long>(remaining, 0, 30));

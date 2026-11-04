@@ -81,7 +81,7 @@ During the blue-screen finale, **Escape** also exits early.
 ## Automatic show
 
 A normal launch runs a **100-second effects sequence**, followed by the
-**two-second silent fake freeze and 10-second blue-screen finale**: approximately **112 seconds total**, excluding
+**two-second silent fake freeze and blue-screen finale**: approximately **115 seconds total**, excluding
 initialization and cleanup.
 
 The show chooses ten distinct visual payloads in a shuffled order. It starts one
@@ -100,9 +100,10 @@ active, so the image becomes progressively more layered.
 | 70 seconds | Add visual #8. | Keep the current sound. |
 | 80 seconds | Add visual #9. | Switch to a different random sound. |
 | 90 seconds | Add visual #10. | Keep the current sound. |
-| 100 seconds | Stop every normal payload; fake-freeze the entire desktop for two seconds. | Stop audio. |
-| 102 seconds | Show the blue-screen finale. | Silent. |
-| 112 seconds | Close the finale and exit. | Silent. |
+| 100 seconds | Freeze the last visible effects across the desktop for two seconds. | Stop audio. |
+| 102 seconds | Show the blue screen, then disable the normal payloads. | Silent. |
+| About 112 seconds | Reach 99% and hold for three seconds. | Silent. |
+| About 115 seconds | Briefly show 0%, then close the entire app. | Silent. |
 
 Sound changes never intentionally choose the immediately previous sound. A short
 crossfade connects selections without an intentional silent stage. A sound may
@@ -242,8 +243,8 @@ every Windows build, localization, or hardware configuration.
 
 ### Duration, sound, and input
 
-- The timer uses a ten-second deadline measured after the first frame is drawn.
-  Progress is derived from elapsed time rather than counting animation frames.
+- Progress rises to 99% over approximately ten seconds, holds there for three
+  seconds, then shows 0% for 250 ms before the entire app exits.
 - Only the progress region is refreshed as the number changes; the blue image is
   not cleared to black between updates.
 - A static snapshot across all monitors simulates a two-second freeze before the
@@ -257,8 +258,8 @@ every Windows build, localization, or hardware configuration.
 - Escape or an emergency shortcut ends the finale early and closes the simulator,
   including when the finale was launched from the menu.
 
-After normal completion, automatic mode exits. Manual mode returns to the panel
-with all effects and audio off. The presentation window is removed, its cursor
+After normal completion, both automatic and manual modes exit the entire app.
+The presentation window is removed, its cursor
 handling ends, and the frozen snapshot is released.
 
 ## Stopping and cleanup

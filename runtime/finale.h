@@ -7,5 +7,6 @@ namespace Runtime {
 inline constexpr int FinaleSeconds = 10;
 // Returns false when dismissed early or the application is shutting down.
 bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& shouldExit,
-    BlueScreenStyle style = BlueScreenStyle::Automatic);
+    BlueScreenStyle style = BlueScreenStyle::Automatic,
+    const std::function<void()>& onPresented = {}, HDC frozenVisual = nullptr);
 }
