@@ -1,6 +1,6 @@
 # Off-screen performance and regression checks
 
-`performance.cpp` exercises **all 33 registered visuals and all 18 sounds**.
+`performance.cpp` exercises **all 34 registered visuals and all 18 sounds**.
 It creates memory DIBs, not presentation windows, and synthesizes audio without
 opening an audio device. It never starts the show or finale. Cursor Trail
 queries the live cursor; Digital Noise Bursts briefly captures the desktop to seed
@@ -80,3 +80,19 @@ $env:JETMY_PROFILE_CSV = "$out\profiler-test.csv"
 if ($LASTEXITCODE -ne 0) { throw 'Profiler checks failed' }
 Remove-Item Env:JETMY_PROFILE_CSV
 ```
+
+Screen Decay has a CPU-buffer-only check (no desktop reads, windows, or audio):
+
+```powershell
+& $compiler tests/screen_decay.cpp payloads/visual/screen_decay.cpp runtime/parallel.cpp `
+    -o "$out\jetmy-screen-decay-test.exe" -std=c++17 -I. -pthread -O3 -ffast-math `
+    -msse2 -mfpmath=sse -mstackrealign -static
+if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
+& "$out\jetmy-screen-decay-test.exe"
+if ($LASTEXITCODE -ne 0) { throw 'Screen Decay checks failed' }
+```
+
+It checks tiny/odd dimensions and both coarse sampling modes, guarded buffers,
+unchanged source pixels, full destination coverage, increasing red coloration,
+late/long-running phases, and deterministic reset after reactivation. It also
+prints a single-frame full-decay cost for each size; use repeated runs for profiling.

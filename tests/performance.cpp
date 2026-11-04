@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
     g_hMemDC = frame.dc; g_pFramePixels = frame.pixels;
     g_hScratchDC = scratch.dc; g_pScratchPixels = scratch.pixels;
     const size_t count = static_cast<size_t>(w) * h;
-    assert(Registry().size() == 33 && SoundPayloads::Registry().size() == 18);
+    assert(Registry().size() == 34 && SoundPayloads::Registry().size() == 18);
     std::vector<uint32_t> input(count);
     for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x)
         input[static_cast<size_t>(y) * w + x] = ((x * 19 + y * 3) & 255) << 16 |

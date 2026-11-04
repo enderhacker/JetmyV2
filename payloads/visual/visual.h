@@ -179,5 +179,6 @@ void EffectHellShader(float, float);
 void EffectSeismicSliceAndDrift(float, float);
 void EffectRecursiveRopCrucible(float, float);
 void EffectBitPlaneTopography(float, float);
+void EffectScreenDecay(float, float);
 
 } // namespace VisualPayloads

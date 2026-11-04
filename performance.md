@@ -8,6 +8,11 @@ linking. See [tests/README.md](tests/README.md) for reproducible commands.
 Sixteen sampled phases per effect, identical synthetic input and RNG seeds;
 means exclude the activation frame. Numbers are milliseconds, rounded.
 
+The before/after audit below covers the original 33 visuals. Screen Decay was
+added afterward; its implementation and checks are described separately below.
+Adding a registry entry changes the benchmark's seeded shuffle, so the historical
+stack figures should not be compared directly with a different payload selection.
+
 The problem is cumulative CPU work, not a special eighth-stage transition.
 At stage eight, eight effects are still rendering, usually with full-screen
 input snapshots. Several original effects individually exceed a 16.7 ms frame
@@ -67,6 +72,26 @@ of software effects can still exceed the frame budget after optimization.
 Activation spikes matter too: Kaleidoscope's first frame fell from
 about **207 to 47 ms**, and Round Tunnel's from **129 to 39 ms**. Geometry caches
 are still rebuilt only when dimensions change. No effects were removed.
+
+### New payload: Screen Decay
+
+This later addition gradually drifts the image off-screen and simulates failing
+video compression, stalled coding tiles, torn strips, and dark red/orange heat
+distortion. The decay reaches its maximum after 35 seconds and stays animated
+without accumulating more state. Re-enabling starts fresh.
+
+On the same 1080p machine, its first frame measured **4.30 ms** and the mean over
+the next 15 sampled early phases was **2.18 ms** (p95 **3.79 ms**). A separate
+full-decay frame measured **1.61 ms**; these are off-screen figures, not a live
+FPS guarantee. Deliberate macroblock artifacts are part of this effect's design,
+not a reduction of the other payloads' rendering quality.
+
+Held state is one color and small metadata per 32-pixel coding tile, bounded by
+screen area. Independent output rows use the existing worker pool; complete
+destination coverage allows frame/scratch buffer exchange. No extra desktop
+capture, GDI calls, audio device, or persistent screenshot history is used.
+`tests/screen_decay.cpp` verifies source immutability, canaries, odd edges,
+long-running decay, reset, off-screen displacement, and compression blocks.
 
 ## Every sound payload
 

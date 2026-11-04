@@ -1,6 +1,6 @@
 # Payloads
 
-All 52 payloads: 33 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
+All 53 payloads: 34 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -41,6 +41,7 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | Sliding Screen Strips | Alternating 2–8-pixel horizontal strips shear in counter-phase; two-pixel vertical columns join halfway through each cycle to form a shredded woven grid. |
 | Zooming Screen Glitch | Expands its previous overlay frame by approximately 101–102% per nominal frame, combining XOR and brightened difference feedback with a periodic desktop-refresh sweep. |
 | Flashing Brightness Bands | Cycles luminance bit-planes from bit 7 to bit 0 as monochrome and neon binary contours, with brief frame-visible inverted flashes. |
+| Screen Decay | Slowly drifts the captured screen slightly off the edges, increases blockiness and color loss, stalls coding tiles and tears strips, then builds dark red/orange heat distortion over 35 seconds. Stays corrupted and animated until disabled; restarting resets the decay. All damage and low-bitrate artifacts are simulated. |
 
 ## Finale
 

@@ -42,7 +42,8 @@ const std::vector<PayloadRecord>& Registry() {
         { "Flashing Color Vortex", EffectHellShader, true, false, true },
         { "Sliding Screen Strips", EffectSeismicSliceAndDrift, true, false, true },
         { "Zooming Screen Glitch", EffectRecursiveRopCrucible, true, false, true },
-        { "Flashing Brightness Bands", EffectBitPlaneTopography, true, false, true }
+        { "Flashing Brightness Bands", EffectBitPlaneTopography, true, false, true },
+        { "Screen Decay", EffectScreenDecay, true, false, true }
     };
     return payloads;
 }
