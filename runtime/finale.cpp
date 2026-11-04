@@ -190,7 +190,9 @@ bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& should
     const auto freezeDeadline = start + std::chrono::seconds(2);
     const auto duration = std::chrono::seconds(FinaleSeconds);
     auto deadline = (screen.frozen ? freezeDeadline : start) + duration;
-    bool holding = false, resetting = false;
+    enum class Phase { Rising, Holding99, Falling, Holding0 };
+    Phase phase = Phase::Rising;
+    int fallingPercent = 99;
     while (!screen.dismissed && !shouldExit()) {
         MSG msg{};
         for (int processed = 0; processed < 64 && PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE); ++processed) {
@@ -211,21 +213,23 @@ bool RunBlueScreenFinale(HINSTANCE instance, const std::function<bool()>& should
             MsgWaitForMultipleObjectsEx(0, nullptr, 10, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
             continue;
         }
-        if (resetting && now >= deadline) return true;
+        if (phase == Phase::Holding0 && now >= deadline) return true;
         auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
         int percent = std::min(99, int(elapsedMs * 100 / (FinaleSeconds * 1000)));
-        if (!holding && !resetting) {
+        if (phase == Phase::Rising) {
             screen.Render(percent);
             if (percent == 99) {
                 UpdateWindow(screen.window);
-                holding = true;
+                phase = Phase::Holding99;
                 deadline = Clock::now() + std::chrono::seconds(3);
             }
-        } else if (holding && now >= deadline) {
-            screen.Render(0);
+        } else if ((phase == Phase::Holding99 || phase == Phase::Falling) && now >= deadline) {
+            // Present every descending percentage instead of jumping straight to zero.
+            screen.Render(--fallingPercent);
             UpdateWindow(screen.window);
-            holding = false; resetting = true;
-            deadline = Clock::now() + std::chrono::milliseconds(250);
+            phase = fallingPercent == 0 ? Phase::Holding0 : Phase::Falling;
+            deadline = Clock::now() + (fallingPercent == 0 ?
+                std::chrono::milliseconds(5000) : std::chrono::milliseconds(100));
         }
         // Keep pumping messages and checking emergency exits; never sleep for ten seconds.
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now()).count();

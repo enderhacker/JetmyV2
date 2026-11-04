@@ -81,7 +81,7 @@ During the blue-screen finale, **Escape** also exits early.
 ## Automatic show
 
 A normal launch runs a **100-second effects sequence**, followed by the
-**two-second silent fake freeze and blue-screen finale**: approximately **115 seconds total**, excluding
+**two-second silent fake freeze and blue-screen finale**: approximately **130 seconds total**, excluding
 initialization and cleanup.
 
 The show chooses ten distinct visual payloads in a shuffled order. It starts one
@@ -103,7 +103,9 @@ active, so the image becomes progressively more layered.
 | 100 seconds | Freeze the last visible effects across the desktop for two seconds. | Stop audio. |
 | 102 seconds | Show the blue screen, then disable the normal payloads. | Silent. |
 | About 112 seconds | Reach 99% and hold for three seconds. | Silent. |
-| About 115 seconds | Briefly show 0%, then close the entire app. | Silent. |
+| About 115 seconds | Count down through 98%, 97%, and so on, at one point per 100 ms. | Silent. |
+| About 125 seconds | Hold at 0% for five seconds. | Silent. |
+| About 130 seconds | Close the entire app. | Silent. |
 
 Sound changes never intentionally choose the immediately previous sound. A short
 crossfade connects selections without an intentional silent stage. A sound may
@@ -244,7 +246,8 @@ every Windows build, localization, or hardware configuration.
 ### Duration, sound, and input
 
 - Progress rises to 99% over approximately ten seconds, holds there for three
-  seconds, then shows 0% for 250 ms before the entire app exits.
+  seconds, then counts down through every percentage to 0% at 100 ms per point.
+  It holds at 0% for five seconds before the entire app exits.
 - Only the progress region is refreshed as the number changes; the blue image is
   not cleared to black between updates.
 - A static snapshot across all monitors simulates a two-second freeze before the

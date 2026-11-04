@@ -54,8 +54,9 @@ Artwork uses a native-resolution canvas, antialiased outline fonts and whole-pix
 QR modules, without upscaling low-resolution screenshots or changing system settings.
 The freeze preserves the last visible effects; payload selections are cleared only
 after the blue screen is painted (audio is muted before the freeze). Progress rises
-to 99% over approximately ten seconds, holds for three seconds, then shows 0% for
-250 ms before the entire app exits in both automatic and manual modes.
+to 99% over approximately ten seconds, holds for three seconds, then counts down
+through 98%, 97%, and every percentage to 0% at 100 ms per point. After holding at
+0% for five seconds, the entire app exits in both automatic and manual modes.
 No crash, reboot, memory dump, display-mode change or global input lock occurs.
 Ordinary input is consumed only while its window has focus. Escape and emergency
 shortcuts can exit early; system shortcuts remain available.
