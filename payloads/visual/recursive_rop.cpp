@@ -17,9 +17,10 @@ void EffectRecursiveRopCrucible(float time, float dt) {
     const float cx = (w - 1) * 0.5f, cy = (h - 1) * 0.5f;
     const bool difference = static_cast<int>(time * 0.8f) & 1;
     const float sweep = fmodf(time, 6.0f);
-    std::vector<int> sourceX(w);
+    static std::vector<int> sourceX;
+    sourceX.resize(w);
     for (int x = 0; x < w; ++x) sourceX[x] = std::clamp(static_cast<int>(cx + (x - cx) / scale), 0, w - 1);
-    for (int y = 0; y < h; ++y) {
+    Runtime::ParallelFor(h, [&](int y) {
         int sy = std::clamp(static_cast<int>(cy + (y - cy) / scale), 0, h - 1);
         const auto* feedback = previous.data() + static_cast<size_t>(sy) * w;
         for (int x = 0; x < w; ++x) {
@@ -38,7 +39,7 @@ void EffectRecursiveRopCrucible(float time, float dt) {
                 color = live & 0x00FFFFFFu;
             g_pFramePixels[i] = color;
         }
-    }
+    });
     // Never read feedback from a buffer being modified in this pass.
     std::copy_n(g_pFramePixels, count, previous.data());
 }

@@ -7,7 +7,8 @@ void EffectBitPlaneTopography(float time, float) {
     // Brief, frame-visible inversions; sub-frame flashes cannot be presented at 60 Hz.
     const bool invert = tick % 19 == 18;
     const int step = RasterStep();
-    for (int y = 0; y < g_ScreenHeight; y += step) {
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
         for (int x = 0; x < g_ScreenWidth; x += step) {
             uint32_t source = Sample(x, y);
             unsigned r = (source >> 16) & 255, g = (source >> 8) & 255, b = source & 255;
@@ -21,6 +22,6 @@ void EffectBitPlaneTopography(float time, float) {
             if (invert) color ^= 0x00FFFFFFu;
             Tile(x, y, step, color);
         }
-    }
+    });
 }
 } // namespace VisualPayloads

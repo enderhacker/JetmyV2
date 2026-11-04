@@ -18,7 +18,13 @@ void EffectInfiniteDesktopCity(float time, float) {
     const float forwardX = sinf(heading), forwardY = cosf(heading);
     const float horizon = h * (0.43f + 0.035f * sinf(time * 0.37f));
     const float focal = w * 0.68f, eye = 0.72f;
-    for (int x = 0; x < w; x += step) {
+    // Distance depends only on the scanline, not on the ray/column.
+    static std::vector<float> streetDistance;
+    streetDistance.resize(h);
+    for (int y = 0; y < h; y += step)
+        streetDistance[y] = eye * focal / std::max(1.0f, y - horizon);
+    Runtime::ParallelFor((w + step - 1) / step, [&](int column) {
+        int x = column * step;
         float screen = (x - w * 0.5f) / focal;
         float dx = forwardX + forwardY * screen, dy = forwardY - forwardX * screen;
         float invX = 1 / std::max(0.00001f, fabsf(dx));
@@ -33,7 +39,7 @@ void EffectInfiniteDesktopCity(float time, float) {
             if (y <= horizon) {
                 color = BlendColor(Sample(x, h - 1 - y), 0x071025, 0.88f);
             } else {
-                float distance = eye * focal / std::max(1.0f, y - horizon);
+                float distance = streetDistance[y];
                 float wx = cameraX + dx * distance, wy = cameraY + dy * distance;
                 float u = wx - floorf(wx), v = wy - floorf(wy);
                 color = BlendColor(Sample(int(u * (w - 1)), int(v * (h - 1))), 0x081020, 0.75f);
@@ -63,17 +69,17 @@ void EffectInfiniteDesktopCity(float time, float) {
             int start = std::max(0, int(floorf(top / step)) * step);
             int end = std::min(ceiling, std::min(h, int(bottom) + step));
             float fog = Smooth(distance / 42);
+            float windowX = wall * 6 - floorf(wall * 6);
             for (int y = start; y < end; y += step) {
                 float v = std::clamp((y - top) / std::max(1.0f, bottom - top), 0.0f, 1.0f);
                 uint32_t color = Sample(int(wall * (w - 1)), int(v * (h - 1)));
                 color = BlendColor(color, side ? 0x162A48 : 0x070C19, side ? 0.25f : 0.5f);
-                float windowX = wall * 6 - floorf(wall * 6);
                 float windowY = v * height * 5 - floorf(v * height * 5);
                 if (windowX < 0.08f || windowY < 0.08f) color = BlendColor(color, 0x55CFE0, 0.6f);
                 Tile(x, y, step, BlendColor(color, 0x14233E, fog));
             }
             ceiling = std::min(ceiling, start);
         }
-    }
+    });
 }
 } // namespace VisualPayloads

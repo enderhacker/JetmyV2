@@ -8,10 +8,32 @@ float EntropyHandshake(uint32_t t, Voice& voice) {
         HDC desktop = GetDC(nullptr);
         if (desktop) {
             int w = GetSystemMetrics(SM_CXSCREEN), h = GetSystemMetrics(SM_CYSCREEN);
+            // GetPixel on a display DC can synchronize with the compositor on
+            // every call. Capture once, then read the same sixteen seed points.
+            HDC capture = CreateCompatibleDC(desktop);
+            BITMAPINFO info{};
+            info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            info.bmiHeader.biWidth = w; info.bmiHeader.biHeight = -h;
+            info.bmiHeader.biPlanes = 1; info.bmiHeader.biBitCount = 32;
+            uint32_t* pixels = nullptr;
+            HBITMAP bitmap = capture && w > 0 && h > 0 ? CreateDIBSection(capture, &info,
+                DIB_RGB_COLORS, reinterpret_cast<void**>(&pixels), nullptr, 0) : nullptr;
+            HGDIOBJ previous = bitmap ? SelectObject(capture, bitmap) : nullptr;
+            bool captured = previous && previous != HGDI_ERROR &&
+                BitBlt(capture, 0, 0, w, h, desktop, 0, 0, SRCCOPY);
+            if (captured) GdiFlush();
             for (int i = 1; i <= 16; ++i) {
-                COLORREF pixel = GetPixel(desktop, (w - 1) * i / 17, (h - 1) * ((i * 7) % 17) / 17);
+                int x = (w - 1) * i / 17, y = (h - 1) * ((i * 7) % 17) / 17;
+                COLORREF pixel;
+                if (captured) {
+                    uint32_t color = pixels[static_cast<size_t>(y) * w + x];
+                    pixel = RGB((color >> 16) & 255, (color >> 8) & 255, color & 255);
+                } else pixel = GetPixel(desktop, x, y);
                 if (pixel != CLR_INVALID) voice.noiseState = (voice.noiseState << 5 | voice.noiseState >> 27) ^ pixel;
             }
+            if (previous && previous != HGDI_ERROR) SelectObject(capture, previous);
+            if (bitmap) DeleteObject(bitmap);
+            if (capture) DeleteDC(capture);
             ReleaseDC(nullptr, desktop);
         }
         if (!voice.noiseState) voice.noiseState = 1;

@@ -67,7 +67,8 @@ void EffectDesktopGlassShatter(float time, float) {
         float edgeA = std::hypot(shard.b.x - shard.c.x, shard.b.y - shard.c.y);
         float edgeB = std::hypot(shard.c.x - shard.a.x, shard.c.y - shard.a.y);
         float edgeC = std::hypot(shard.a.x - shard.b.x, shard.a.y - shard.b.y);
-        for (int y = top; y < bottom; y += step) {
+        Runtime::ParallelFor(std::max(0, (bottom - top + step - 1) / step), [&](int row) {
+            int y = top + row * step;
             for (int x = left; x < right; x += step) {
                 float dx = x - shard.center.x - shiftX, dy = y - shard.center.y - shiftY;
                 float sx = shard.center.x + dx * c + dy * s, sy = shard.center.y - dx * s + dy * c;
@@ -79,7 +80,7 @@ void EffectDesktopGlassShatter(float time, float) {
                     v / std::max(0.001f, edgeB), w / std::max(0.001f, edgeC)});
                 Tile(x, y, step, BlendColor(Sample(int(sx), int(sy)), 0xC5EBFF, seam < 0.7f ? 0.45f : 0.025f));
             }
-        }
+        });
     }
 }
 } // namespace VisualPayloads

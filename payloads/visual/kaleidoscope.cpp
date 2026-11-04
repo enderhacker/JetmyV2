@@ -11,7 +11,7 @@ void EffectKaleidoscopicReality(float time, float) {
     int columns = (g_ScreenWidth + step - 1) / step, rows = (g_ScreenHeight + step - 1) / step;
     if (cachedW != g_ScreenWidth || cachedH != g_ScreenHeight) {
         map.resize(static_cast<size_t>(columns) * rows);
-        for (int row = 0; row < rows; ++row) {
+        Runtime::ParallelFor(rows, [&](int row) {
             for (int col = 0; col < columns; ++col) {
                 float dx = col * step - g_ScreenWidth * 0.5f, dy = row * step - g_ScreenHeight * 0.5f;
                 float radius = sqrtf(dx * dx + dy * dy);
@@ -19,7 +19,7 @@ void EffectKaleidoscopicReality(float time, float) {
                 angle = std::min(angle, Pi / 3 - angle);
                 map[static_cast<size_t>(row) * columns + col] = {cosf(angle) * radius, sinf(angle) * radius};
             }
-        }
+        });
         cachedW = g_ScreenWidth; cachedH = g_ScreenHeight;
     }
     float c = cosf(time * 0.14f), s = sinf(time * 0.14f);
@@ -28,16 +28,17 @@ void EffectKaleidoscopicReality(float time, float) {
     auto mirror = [](int value, int size) {
         if (size <= 1) return 0;
         int period = 2 * (size - 1);
-        value = (value % period + period) % period;
+        value %= period;
+        if (value < 0) value += period;
         return value < size ? value : period - value;
     };
-    for (int row = 0; row < rows; ++row) {
+    Runtime::ParallelFor(rows, [&](int row) {
         for (int col = 0; col < columns; ++col) {
             const auto& p = map[static_cast<size_t>(row) * columns + col];
             int sx = mirror(int(cx + p.x * c - p.y * s), g_ScreenWidth);
             int sy = mirror(int(cy + p.x * s + p.y * c), g_ScreenHeight);
             Tile(col * step, row * step, step, Sample(sx, sy));
         }
-    }
+    });
 }
 }

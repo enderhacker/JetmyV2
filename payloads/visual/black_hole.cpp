@@ -44,7 +44,8 @@ void EffectBlackHoleSingularities(float time, float dt) {
     int left = std::max(0, int(hx - radius)), top = std::max(0, int(hy - radius));
     int right = std::min(g_ScreenWidth, int(hx + radius + 1));
     int bottom = std::min(g_ScreenHeight, int(hy + radius + 1));
-    for (int y = top; y < bottom; y += step) {
+    Runtime::ParallelFor((bottom - top + step - 1) / step, [&](int row) {
+        int y = top + row * step;
         for (int x = left; x < right; x += step) {
             float dx = (x - hx) / radius, dy = (y - hy) / radius;
             float r2 = dx * dx + dy * dy;
@@ -61,6 +62,6 @@ void EffectBlackHoleSingularities(float time, float dt) {
             color = BlendColor(color, hot, ring * 0.95f);
             Tile(x, y, step, BlendColor(Sample(x, y), color, edge));
         }
-    }
+    });
 }
 }

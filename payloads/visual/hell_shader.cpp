@@ -26,7 +26,8 @@ void EffectHellShader(float time, float) {
         return table;
     }();
     auto fastSin = [&](float value) { return sine[static_cast<unsigned>(static_cast<int>(value * (4096.0f / Tau))) & 4095u]; };
-    for (int y = 0; y < g_ScreenHeight; y += step) {
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
         float band = sinf(y * 0.055f + t * 9.0f);
         for (int x = 0; x < g_ScreenWidth; x += step) {
             const auto& point = map[static_cast<size_t>(y / step) * columns + x / step];
@@ -42,6 +43,6 @@ void EffectHellShader(float time, float) {
             if (flash > 0) pattern ^= 0x00FFFFFFu;
             Tile(x, y, step, BlendColor(source ^ pattern, pattern, 0.55f));
         }
-    }
+    });
 }
 } // namespace VisualPayloads

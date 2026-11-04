@@ -5,10 +5,15 @@ void EffectChaosShader(float time, float) {
     // CPU shader: warp the incoming image and mix it with animated interference.
     int step = RasterStep();
     float t = fmodf(time, 1000.0f);
-    for (int y = 0; y < g_ScreenHeight; y += step) {
+    static std::vector<float> waves;
+    waves.resize(g_ScreenWidth);
+    for (int x = 0; x < g_ScreenWidth; x += step)
+        waves[x] = sinf(x * 0.021f - t * 1.7f);
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
         float waveY = sinf(y * 0.025f + t * 2.1f);
         for (int x = 0; x < g_ScreenWidth; x += step) {
-            float waveX = sinf(x * 0.021f - t * 1.7f);
+            float waveX = waves[x];
             int sx = x + static_cast<int>(waveY * 24 + waveX * 8);
             int sy = y + static_cast<int>(waveX * 20 + waveY * 7);
             uint32_t source = Sample(sx, sy);
@@ -19,6 +24,6 @@ void EffectChaosShader(float time, float) {
                 static_cast<uint32_t>((waveY + 1) * 127.5f);
             Tile(x, y, step, BlendColor(source, color, 0.48f));
         }
-    }
+    });
 }
 } // namespace VisualPayloads

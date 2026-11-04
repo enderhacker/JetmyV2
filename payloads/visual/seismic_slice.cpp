@@ -10,16 +10,27 @@ void EffectSeismicSliceAndDrift(float time, float) {
     // Counter-phase rows first, then two-pixel columns in the second half-cycle.
     const bool woven = fmodf(time, 2.0f) >= 1.0f;
     const int vertical = woven ? static_cast<int>(std::min(100.0f, h * 0.07f) * sinf(phase + Pi * 0.5f)) : 0;
-    std::vector<int> columns(w);
-    for (int x = 0; x < w; ++x) columns[x] = ((x / 2) & 1) ? -vertical : vertical;
-    for (int y = 0; y < h; ++y) {
-        auto* row = g_pFramePixels + static_cast<size_t>(y) * w;
-        for (int x = 0; x < w; ++x) {
-            int sy = ((y - columns[x]) % h + h) % h;
-            int offset = ((sy / strip) & 1) ? -drift : drift;
-            int sx = ((x - offset) % w + w) % w;
-            row[x] = g_pScratchPixels[static_cast<size_t>(sy) * w + sx] & 0x00FFFFFFu;
-        }
+    static std::vector<int> positiveX, negativeX;
+    positiveX.resize(w); negativeX.resize(w);
+    auto wrap = [](int value, int size) {
+        if (value < 0) value += size;
+        else if (value >= size) value -= size;
+        return value;
+    };
+    for (int x = 0; x < w; ++x) {
+        positiveX[x] = wrap(x - drift, w);
+        negativeX[x] = wrap(x + drift, w);
     }
+    Runtime::ParallelFor(h, [&](int y) {
+        auto* row = g_pFramePixels + static_cast<size_t>(y) * w;
+        const int sy0 = wrap(y - vertical, h), sy1 = wrap(y + vertical, h);
+        const auto* source0 = g_pScratchPixels + static_cast<size_t>(sy0) * w;
+        const auto* source1 = g_pScratchPixels + static_cast<size_t>(sy1) * w;
+        const auto& x0 = ((sy0 / strip) & 1) ? negativeX : positiveX;
+        const auto& x1 = ((sy1 / strip) & 1) ? negativeX : positiveX;
+        for (int x = 0; x < w; ++x) {
+            row[x] = (((x / 2) & 1) ? source1[x1[x]] : source0[x0[x]]) & 0x00FFFFFFu;
+        }
+    });
 }
 } // namespace VisualPayloads

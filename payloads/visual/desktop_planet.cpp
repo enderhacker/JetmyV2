@@ -10,7 +10,8 @@ void EffectDesktopPlanet(float time, float) {
     // globe and its far half disappears behind it (rather than a flat ellipse).
     const float tilt = 0.65f + 0.14f * sinf(time * 0.27f);
     const float sn = sinf(tilt), cs = cosf(tilt);
-    for (int y = 0; y < h; y += step) {
+    Runtime::ParallelFor((h + step - 1) / step, [&](int row) {
+        int y = row * step;
         for (int x = 0; x < w; x += step) {
             float px = (x - cx) / (unit * 0.31f), py = (y - cy) / (unit * 0.31f);
             float radius2 = px * px + py * py;
@@ -19,6 +20,9 @@ void EffectDesktopPlanet(float time, float) {
             uint32_t hash = uint32_t(x / step) * 374761393u ^ uint32_t(y / step) * 668265263u;
             hash = (hash ^ (hash >> 13)) * 1274126177u;
             if (hash % 3203u == 0) color = 0x8FACC8;
+            // Neither the halo nor the projected ring can reach this far.
+            // Keep the exact sampled star field without evaluating sqrt/atan.
+            if (radius2 > 4.0f) { Tile(x, y, step, color); continue; }
             float surfaceZ = -10;
             if (radius2 < 1) {
                 surfaceZ = sqrtf(1 - radius2);
@@ -32,7 +36,7 @@ void EffectDesktopPlanet(float time, float) {
                 color = BlendColor(0x030917, texture, 0.12f + 0.88f * light);
                 float rim = powf(1 - surfaceZ, 3.0f);
                 color = BlendColor(color, 0x65CFFF, rim * 0.8f);
-            } else {
+            } else if (radius2 < 1.24f) {
                 float halo = std::max(0.0f, 1 - (sqrtf(radius2) - 1) / 0.11f);
                 color = BlendColor(color, 0x247BAA, halo * halo * 0.5f);
             }
@@ -50,6 +54,6 @@ void EffectDesktopPlanet(float time, float) {
             }
             Tile(x, y, step, color);
         }
-    }
+    });
 }
 } // namespace VisualPayloads

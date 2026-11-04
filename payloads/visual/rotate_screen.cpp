@@ -7,7 +7,8 @@ void EffectRotateScreen(float time, float) {
     float c = cosf(angle), s = sinf(angle);
     float cx = (g_ScreenWidth - 1) * 0.5f, cy = (g_ScreenHeight - 1) * 0.5f;
     int step = RasterStep();
-    for (int y = 0; y < g_ScreenHeight; y += step) {
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
         float dy = y - cy;
         for (int x = 0; x < g_ScreenWidth; x += step) {
             float dx = x - cx;
@@ -17,6 +18,6 @@ void EffectRotateScreen(float time, float) {
                 color = Sample(int(sx), int(sy));
             Tile(x, y, step, color);
         }
-    }
+    });
 }
 } // namespace VisualPayloads

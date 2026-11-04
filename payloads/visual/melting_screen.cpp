@@ -31,20 +31,33 @@ void EffectMeltingScreen(float time, float) {
         offsets[x] = acceleration * age * age * bulge * g_ScreenHeight;
     }
     int step = RasterStep();
+    struct Column { float displacement, stretch, slope, poolDepth, shade; };
+    static std::vector<Column> columns;
+    columns.resize(g_ScreenWidth);
     for (int x = 0; x < g_ScreenWidth; x += step) {
         float displacement = offsets[x];
         float front = displacement;
         float stretch = 1 + displacement / g_ScreenHeight * 0.85f;
         float slope = (offsets[std::min(g_ScreenWidth - 1, x + step)] - offsets[std::max(0, x - step)]) / (2 * step);
         float poolDepth = std::min(g_ScreenHeight * 0.12f, displacement * 0.09f) * (1 - Smooth((displacement / g_ScreenHeight - 0.7f) / 0.3f));
-        for (int y = 0; y < g_ScreenHeight; y += step) {
+        float shade = std::min(0.25f, fabsf(slope) * 0.07f) * Smooth(displacement / 35);
+        columns[x] = {front, stretch, slope, poolDepth, shade};
+    }
+    // Contiguous row writes rather than striding an entire framebuffer per column.
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
+        for (int x = 0; x < g_ScreenWidth; x += step) {
+            const auto& column = columns[x];
+            float front = column.displacement, stretch = column.stretch;
+            float slope = column.slope, poolDepth = column.poolDepth;
+            float displacement = front;
             float distance = y - front;
             uint32_t color = 0x000000;
             if (distance >= 0) {
                 float sourceY = distance / stretch;
                 color = Sample(x, int(sourceY));
                 // Viscous folds have a shaded side and a narrow wet leading lip.
-                float shade = std::min(0.25f, fabsf(slope) * 0.07f) * Smooth(displacement / 35);
+                float shade = column.shade;
                 color = BlendColor(color, slope > 0 ? 0x030507 : 0xFFF1D7, shade);
                 float lip = (1 - Smooth(distance / std::max(2.0f, g_ScreenHeight * 0.006f))) * Smooth(displacement / 25);
                 color = BlendColor(color, 0xFFF5E1, lip * 0.38f);
@@ -59,6 +72,6 @@ void EffectMeltingScreen(float time, float) {
             }
             Tile(x, y, step, BlendColor(color, Sample(x, y), fade));
         }
-    }
+    });
 }
 } // namespace VisualPayloads

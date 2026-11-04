@@ -11,12 +11,13 @@ void EffectLiquidDesktop(float time, float) {
         horizontal[y] = amplitude * (sinf(y * 0.018f + time * 1.7f) + 0.4f * sinf(y * 0.041f - time));
     for (int x = 0; x < g_ScreenWidth; x += step)
         vertical[x] = amplitude * 0.7f * sinf(x * 0.016f - time * 1.4f);
-    for (int y = 0; y < g_ScreenHeight; y += step) {
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
         for (int x = 0; x < g_ScreenWidth; x += step) {
             uint32_t color = Sample(int(x + horizontal[y]), int(y + vertical[x]));
             float caustic = std::max(0.0f, (horizontal[y] + vertical[x]) / (amplitude * 2.2f));
             Tile(x, y, step, BlendColor(color, 0xA1E8EF, caustic * caustic * 0.22f));
         }
-    }
+    });
 }
 }

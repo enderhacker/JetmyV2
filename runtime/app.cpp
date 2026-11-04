@@ -4,6 +4,7 @@
 #include "menu.h"
 #include "app.h"
 #include "finale.h"
+#include "profiler.h"
 #include <chrono>
 #include <numeric>
 #include <random>
@@ -145,6 +146,7 @@ int Run(HINSTANCE instance, bool menuMode) {
     g_ScreenHeight = GetSystemMetrics(SM_CYSCREEN);
     if (g_ScreenWidth <= 0 || g_ScreenHeight <= 0) throw std::runtime_error("Invalid screen dimensions.");
     const size_t totalBytes = static_cast<size_t>(g_ScreenWidth) * g_ScreenHeight * sizeof(uint32_t);
+    Runtime::FrameProfiler profiler(g_ScreenWidth, g_ScreenHeight);
 
     Framebuffer frame, scratch, base;
     frame.Create(g_ScreenWidth, g_ScreenHeight);
@@ -261,6 +263,8 @@ int Run(HINSTANCE instance, bool menuMode) {
             continue;
         }
 
+        const bool profileFrame = profiler.Enabled();
+        auto captureStart = profileFrame ? Clock::now() : Clock::time_point{};
         HDC desktop = GetDC(nullptr);
         if (!desktop) throw std::runtime_error("Cannot capture desktop.");
         BOOL captured = BitBlt(base.dc, 0, 0, g_ScreenWidth, g_ScreenHeight, desktop, 0, 0, SRCCOPY);
@@ -287,7 +291,8 @@ int Run(HINSTANCE instance, bool menuMode) {
                 historyReady = true;
             }
         }
-        memcpy(frame.pixels, base.pixels, totalBytes);
+        memcpy(g_pFramePixels, base.pixels, totalBytes);
+        if (profileFrame) profiler.Record(stage, "Capture + history + base copy", captureStart);
         // Automatic mode retains shuffled stacking order; manual mode uses registry order.
         for (size_t order = 0; order < visuals.size(); ++order) {
             size_t index = menuMode ? order : pool[order];
@@ -296,16 +301,23 @@ int Run(HINSTANCE instance, bool menuMode) {
             if (firstFrame) activated[index] = now;
             float age = firstFrame ? 0 : std::chrono::duration<float>(now - activated[index]).count();
             const auto& payload = visuals[index];
-            if (payload.needsSnapshot) memcpy(scratch.pixels, frame.pixels, totalBytes);
-            if (payload.fn == EffectInfiniteTunnel || payload.fn == Effect3DWarpTunnel) DrawCapturedCursor(scratch.dc);
-            if (payload.blackBackground) std::fill_n(frame.pixels, totalBytes / sizeof(uint32_t), 0u);
+            auto payloadStart = profileFrame ? Clock::now() : Clock::time_point{};
+            PreparePayloadFrame(payload);
+            if (payload.fn == EffectInfiniteTunnel || payload.fn == Effect3DWarpTunnel) DrawCapturedCursor(g_hScratchDC);
             payload.fn(age, firstFrame ? 0 : std::min(dt, 0.1f));
             wasEnabled[index] = true;
             GdiFlush();
+            if (profileFrame) profiler.Record(stage, payload.name, payloadStart);
         }
-        if (!UpdateLayeredWindow(overlay.window, nullptr, &origin, &size, frame.dc, &origin, 0, &blend, ULW_ALPHA))
+        auto presentStart = profileFrame ? Clock::now() : Clock::time_point{};
+        if (!UpdateLayeredWindow(overlay.window, nullptr, &origin, &size, g_hMemDC, &origin, 0, &blend, ULW_ALPHA))
             throw std::runtime_error("Cannot present overlay frame.");
         if (!shown) { ShowWindow(overlay.window, SW_SHOWNOACTIVATE); shown = true; }
+        if (profileFrame) {
+            profiler.Record(stage, "Presentation", presentStart);
+            profiler.Record(stage, "Frame total (before pacing)", now);
+        }
+        profiler.NextFrame();
         // Rendering time counts toward the frame budget instead of adding to it.
         auto remaining = std::chrono::milliseconds(16) - (Clock::now() - now);
         if (remaining > Clock::duration::zero())

@@ -42,7 +42,9 @@ void EffectPixelSortingAnomaly(float time, float dt) {
         for (int y = 0; y < b.h; ++y) {
             auto* row = g_pFramePixels + static_cast<size_t>(b.y + y) * w + b.x;
             int offset = ((y / 3) & 1) ? b.slip : b.w - b.slip;
-            for (int x = 0; x < b.w; ++x) row[x] = sorted[(x + offset) % b.w];
+            // Exactly the same cyclic slip, without a division per output pixel.
+            std::copy_n(sorted.data() + offset, b.w - offset, row);
+            std::copy_n(sorted.data(), offset, row + b.w - offset);
         }
     }
 }

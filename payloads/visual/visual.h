@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstring>
 #include <vector>
+#include "../../runtime/parallel.h"
 
 namespace VisualPayloads {
 
@@ -128,7 +129,21 @@ struct PayloadRecord {
     bool needsSnapshot = true;
     // Clear the destination AFTER preserving the incoming image for texturing.
     bool blackBackground = false;
+    // True only when every destination pixel is replaced, even on odd edges.
+    bool writesAllPixels = false;
 };
+inline void PreparePayloadFrame(const PayloadRecord& payload) {
+    const size_t count = static_cast<size_t>(g_ScreenWidth) * g_ScreenHeight;
+    if (payload.needsSnapshot) {
+        if (payload.writesAllPixels || payload.blackBackground) {
+            // The old destination becomes the immutable input. A full overwrite
+            // needs no copy into the other DIB; partial effects still need one.
+            std::swap(g_pFramePixels, g_pScratchPixels);
+            std::swap(g_hMemDC, g_hScratchDC);
+        } else std::copy_n(g_pFramePixels, count, g_pScratchPixels);
+    }
+    if (payload.blackBackground) std::fill_n(g_pFramePixels, count, 0u);
+}
 const std::vector<PayloadRecord>& Registry();
 
 void EffectChaosRectangles(float, float);

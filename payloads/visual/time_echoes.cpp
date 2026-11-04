@@ -27,7 +27,8 @@ void EffectDesktopTimeEchoes(float time, float) {
         columns[i] = {panel, sx, sourceX - sx, opacity};
     }
     // Walk contiguous rows, not cache-hostile full-height columns.
-    for (int y = 0; y < g_ScreenHeight; y += step) {
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
         std::array<const uint32_t*, 4> rows{};
         std::array<const uint32_t*, 4> nextRows{};
         std::array<float, 4> fractions{};
@@ -50,6 +51,6 @@ void EffectDesktopTimeEchoes(float time, float) {
             }
             Tile(x, y, step, BlendColor(Sample(x, y), echo, col.opacity));
         }
-    }
+    });
 }
 }

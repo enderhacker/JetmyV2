@@ -127,8 +127,8 @@ Launch with `--menu` to open a native Windows control panel. All payloads start
   A black-backed effect covers earlier layers; effects drawn afterward can still
   appear on top. Ordinary desktop distortions keep their image backgrounds.
 - Turning off every visual hides the effects overlay. The idle/audio-only menu
-  does not capture or render desktop frames. Entropy Handshake reads a few desktop
-  pixels once when its audio loop is generated, solely to seed its noise.
+   does not capture or render visual frames. Entropy Handshake makes one temporary
+   desktop capture when its audio loop is generated, using 16 pixels solely to seed its noise.
 - The panel stays clear of the visual overlay so its controls remain usable.
 
 ### Audio controls
@@ -199,6 +199,11 @@ not actual device failures or reads of CPU/process memory. The stream remains
 1–3.6 kHz, not the upper human hearing range. Bounded PCM does not guarantee safe
 listening volume; start low. Entropy Handshake discards sampled pixel values immediately after mixing
 them into its local LFSR seed; it does not save or transmit desktop images.
+
+For a payload-by-payload performance audit, measured improvements, off-screen
+tests and optional runtime timing traces, see **[performance.md](performance.md)**.
+Rendering preserves the existing sampling quality and uses a bounded CPU worker
+pool for independent pixel work; stacked effects still run in their original order.
 
 ## Blue-screen finale
 

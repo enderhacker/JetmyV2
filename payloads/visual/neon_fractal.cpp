@@ -17,7 +17,8 @@ void EffectNeonFractalInvasion(float time, float) {
     float scale = 2.8f / std::max(1, std::min(g_ScreenWidth, g_ScreenHeight));
     float c = cosf(time * 0.06f), s = sinf(time * 0.06f);
     int step = RasterStep() * 2; // Julia iterations have a separate, lower sample budget.
-    for (int y = 0; y < g_ScreenHeight; y += step) {
+    Runtime::ParallelFor((g_ScreenHeight + step - 1) / step, [&](int row) {
+        int y = row * step;
         float dy = (y - g_ScreenHeight * 0.5f) * scale;
         for (int x = 0; x < g_ScreenWidth; x += step) {
             float dx = (x - g_ScreenWidth * 0.5f) * scale;
@@ -31,6 +32,6 @@ void EffectNeonFractalInvasion(float time, float) {
             float density = Smooth(iteration / 12.0f);
             Tile(x, y, step, BlendColor(Sample(x, y), palette[iteration], 0.2f + density * 0.6f));
         }
-    }
+    });
 }
 }

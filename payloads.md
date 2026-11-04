@@ -66,7 +66,7 @@ page. The Windows 11 preset intentionally does not use its newer black design.
 | Payload | Quick summary |
 | --- | --- |
 | Bytebeat Industrial Scream | Abrasive recursive-shift bytebeat, syncopated clock dividers and ring-modulated, bit-crushed sawtooth sweeps. |
-| Entropy Handshake | Desktop-pixel-seeded LFSR bursts alternate high-pass and band-pass noise with collision clicks and sharp carrier bursts; uses 3 kHz rather than a 4 kHz Nyquist-limit carrier in the 8 kHz stream. |
+| Entropy Handshake | LFSR bursts seeded from 16 pixels in one temporary desktop capture alternate high-pass and band-pass noise with collision clicks and sharp carrier bursts; uses 3 kHz rather than a 4 kHz Nyquist-limit carrier in the 8 kHz stream. |
 | Buffer Freeze Stutter | Loops an approximately 12 ms synthetic buffer fragment with pitch jitter, granular slips and clipped distortion. |
 | Dual-Tone Siren Warp | Out-of-phase square-wave sirens rapidly sweep between 450 Hz and 3.8 kHz. |
 | Bytebeat Xenon Tear | Unsigned shift/multiply/XOR formula fractures into metallic ticks and noise bursts. |
