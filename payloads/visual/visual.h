@@ -150,7 +150,6 @@ void EffectDesktopTimeEchoes(float, float);
 void Effect3DWarpTunnel(float, float);
 void EffectInfiniteDesktopCity(float, float);
 void EffectDesktopPlanet(float, float);
-void EffectMobiusRealityRibbon(float, float);
 void EffectRealityCollapseFinale(float, float);
 void EffectRotateScreen(float, float);
 void EffectRandomStatusIcons(float, float);

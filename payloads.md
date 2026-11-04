@@ -1,6 +1,6 @@
 # Payloads
 
-All 53 payloads: 34 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
+All 52 payloads: 33 visual effects, one finale and 18 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -27,7 +27,6 @@ the desktop or Windows display settings. Audio payloads loop while selected.
 | 3D Warp Tunnel | Maps the desktop onto a perspective tunnel with rings and radial ribs. |
 | Infinite Desktop City | Flies down a night-time avenue between desktop-textured skyscrapers, with luminous window grids, street reflections and distance fog. |
 | Desktop Planet | Wraps the desktop around a rotating globe with atmospheric glow and a tilted, textured ring that passes in front and behind. |
-| Mobius Reality Ribbon | Folds the desktop into a rotating, half-twisted 3D ribbon with scrolling textures, contrasting faces and luminous edges. |
 | Reality Collapse Finale | Compresses the screen vertically and horizontally, then reopens it with an afterglow. |
 | Rotate Screen | Continuously rotates the captured desktop image around its center. |
 | Random Status Icons | Places warning, success, information and error icons at random positions and sizes. |

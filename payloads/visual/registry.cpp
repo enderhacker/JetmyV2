@@ -29,7 +29,6 @@ const std::vector<PayloadRecord>& Registry() {
         { "3D Warp Tunnel", Effect3DWarpTunnel },
         { "Infinite Desktop City", EffectInfiniteDesktopCity },
         { "Desktop Planet", EffectDesktopPlanet },
-        { "Mobius Reality Ribbon", EffectMobiusRealityRibbon },
         { "Reality Collapse Finale", EffectRealityCollapseFinale, true, true },
         { "Rotate Screen", EffectRotateScreen },
         { "Random Status Icons", EffectRandomStatusIcons, false },
