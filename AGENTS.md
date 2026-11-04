@@ -13,13 +13,12 @@
 ## Repository layout
 - `src/` contains application code with the existing `runtime/` and `payloads/` groups; keep related headers beside implementations.
 - `docs/` contains supporting documentation, `scripts/` contains distribution and inspection utilities, and `resources/` contains Windows resources.
-- `third_party/` contains retained vendor code. `vmaware.hpp` is not used by the current application.
 - Keep `README.md`, `AGENTS.md`, and the `compile.cmd` build entry point at the root. Generated output belongs in `build/`.
 
 ## Runtime contracts
 - `src/main.cpp` delegates to `Runtime::RunApplication`; `src/runtime/app.cpp` owns capture, framebuffers, stacking, and audio selection. The menu changes `Controls`; it does not render or play payloads itself.
 - Manual stacking follows registry order, not the menu's alphabetical display order. Keep menu command IDs and selection state mapped to registry indices.
-- `src/runtime/schedule.h` controls the automatic show: ten distinct visuals accumulate at ten-second intervals; audio changes every other stage. The actual blue-screen finale is separate (`src/runtime/finale.cpp`), not a visual registry entry. `Screen Collapse` is an ordinary visual, not the finale.
+- `src/runtime/schedule.h` controls the automatic show: ten distinct visuals accumulate at ten-second intervals; audio changes every stage alongside the new visual. The actual blue-screen finale is separate (`src/runtime/finale.cpp`), not a visual registry entry. `Screen Collapse` is an ordinary visual, not the finale.
 - Preserve the simulator boundary: effects modify temporary overlays/in-memory audio, not Windows settings or other applications. Preserve capture exclusion, the menu's overlay cutout, emergency exits, and cleanup. Normal visuals target the primary monitor; only the finale covers the virtual desktop.
 
 ## Visual payloads

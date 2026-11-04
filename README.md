@@ -97,20 +97,21 @@ initialization and cleanup.
 
 The show chooses ten distinct visual payloads in a shuffled order. It starts one
 visual immediately, then adds another every ten seconds. Previous visuals stay
-active, so the image becomes progressively more layered.
+active, so the image becomes progressively more layered. The sound changes with
+each new visual, every ten seconds.
 
 | Time | Visual behavior | Audio behavior |
 | --- | --- | --- |
 | 0 seconds | Visual #1 starts. | A random sound starts looping. |
-| 10 seconds | Add visual #2. | Keep the current sound. |
+| 10 seconds | Add visual #2. | Switch to a different random sound. |
 | 20 seconds | Add visual #3. | Switch to a different random sound. |
-| 30 seconds | Add visual #4. | Keep the current sound. |
+| 30 seconds | Add visual #4. | Switch to a different random sound. |
 | 40 seconds | Add visual #5. | Switch to a different random sound. |
-| 50 seconds | Add visual #6. | Keep the current sound. |
+| 50 seconds | Add visual #6. | Switch to a different random sound. |
 | 60 seconds | Add visual #7. | Switch to a different random sound. |
-| 70 seconds | Add visual #8. | Keep the current sound. |
+| 70 seconds | Add visual #8. | Switch to a different random sound. |
 | 80 seconds | Add visual #9. | Switch to a different random sound. |
-| 90 seconds | Add visual #10. | Keep the current sound. |
+| 90 seconds | Add visual #10. | Switch to a different random sound. |
 | 100 seconds | Freeze the last visible effects across the desktop for two seconds. | Stop audio. |
 | 102 seconds | Show the blue screen, then disable the normal payloads. | Silent. |
 | About 112 seconds | Reach 99% and hold for three seconds. | Silent. |
@@ -362,7 +363,6 @@ like a normal local Windows desktop.
 | `src/payloads/visual/` | Individual visual implementations, rendering helpers, registry, and popup styling. |
 | `src/payloads/sound/` | Sound generators, synthesis helpers, registry, loop synthesis, and streaming player. |
 | `resources/version.rc` | Windows manifest and executable version metadata. |
-| `third_party/vmaware.hpp` | Retained third-party header; not used by the current application. |
 | `scripts/` | Distribution installer and Python executable-compatibility utility. |
 | `docs/` | [Payload catalog](docs/payloads.md), [performance audit](docs/performance.md), and [distribution instructions](docs/distribute.md). |
 | `compile.cmd` | Release build entry point; run from the repository root. |
