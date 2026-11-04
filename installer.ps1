@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 # Set to $true to show diagnostics. Leave $false for a silent installation.
-$Debug = $true
+$Debug = $false
 
 function Write-InstallerLog {
     param([string]$Message)
