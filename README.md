@@ -58,20 +58,31 @@ desktop can still affect the applications underneath.
 Use Windows 10 or Windows 11 for the current build. An audio output device is
 needed for sound, but the visual show can continue if audio is unavailable.
 
+Both automatic and manual modes require **two explicit confirmations** before
+initializing capture, overlays, or audio. In **each** dialog, **Yes is disabled for
+the first three seconds**, with a countdown showing the remaining wait. Each
+dialog defaults to **No**; No, Escape, or closing the dialog exits immediately,
+including during the countdown. Approval is not saved between launches.
+
+There is no automatic VM detection or VM-only restriction. The startup gate does
+not probe hardware, registry keys, network adapters, or Windows installation age.
+Help and argument errors do not show confirmations. If a timed confirmation cannot
+be displayed, startup fails instead of falling back to an unprotected prompt.
+
 From a PowerShell terminal in the executable's folder:
 
 ```powershell
 # Manual preview: everything starts off. Recommended for a first run.
 .\JetmyV2.exe --menu
 
-# Automatic show: starts visuals and audio immediately.
+# Automatic show: starts visuals and audio after two timed confirmations.
 .\JetmyV2.exe
 
 # Display usage without starting effects.
 .\JetmyV2.exe --help
 ```
 
-Double-clicking the executable starts the **automatic show**, not the control
+Double-clicking the executable selects the **automatic show**, not the control
 panel. `-h` also displays help. Unknown command-line arguments display a usage
 error instead of starting effects.
 
@@ -80,7 +91,7 @@ During the blue-screen finale, **Escape** also exits early.
 
 ## Automatic show
 
-A normal launch runs a **100-second effects sequence**, followed by the
+A normal launch, after both timed confirmations, runs a **100-second effects sequence**, followed by the
 **two-second silent fake freeze and blue-screen finale**: approximately **130 seconds total**, excluding
 initialization and cleanup.
 
@@ -116,7 +127,8 @@ Exiting early skips the remaining sequence and the finale.
 
 ## Manual control panel
 
-Launch with `--menu` to open a native Windows control panel. All payloads start
+Launch with `--menu` to open a native Windows control panel after both timed
+confirmations. All payloads start
 **off**, and there is **no automatic timeout or stage progression**.
 
 ### Visual controls
@@ -298,6 +310,7 @@ The script compiles `main.cpp` and the C++ modules in `runtime/`,
 `payloads/visual/`, and `payloads/sound/` into **`JetmyV2.exe`**. It enables
 optimization, link-time optimization, and static runtime linking. Windows GDI/GDI+,
 User32, WinMM, and Shell32 provide drawing, windowing, audio, and argument parsing.
+Manifest-enabled Windows common controls v6 provide the timed confirmation dialogs.
 Popup theming functions are loaded dynamically when available.
 
 **Build-script warning:** before compiling, `compile.cmd` forcibly stops a running
@@ -309,6 +322,10 @@ After rebuilding, start with the manual panel to inspect the current version:
 ```powershell
 .\JetmyV2.exe --menu
 ```
+
+Run the non-interactive startup confirmation/timing tests with
+`.\tests\run_startup_tests.ps1`; see [tests/README.md](tests/README.md).
+These tests do not start effects or audio and can run on physical build machines.
 
 Legacy-looking XP/Vista/7 presets do **not** guarantee that the executable runs on
 those operating systems. Runtime compatibility depends on the compiler and the
@@ -322,6 +339,7 @@ been established by the availability of those styles.
 | `g++` is not found | Install MinGW-w64, add its `bin` directory to `PATH`, and reopen the terminal. |
 | The build cannot replace the executable | Close the simulator and any process holding the file, then rebuild. Check the compiler output for other errors. |
 | Changes are missing | Run `compile.cmd` and launch the newly built executable from that same folder. Editing source does not update an existing `.exe`. |
+| Timed confirmations cannot be displayed | Rebuild with `windres` available so the common-controls v6 manifest in `version.rc` is embedded. Use Windows 10/11; startup will not bypass the warnings if dialog creation fails. |
 | No sound | Check the selected output device, application mixer, and speaker volume. In the menu, select a sound again after correcting the device problem. |
 | Visuals are slow | Try fewer simultaneous effects or a lower desktop resolution. Stacked effects increase CPU and memory work. |
 | Screenshots or screen sharing omit effects | Normal preview windows use capture exclusion to avoid capturing themselves recursively. Capture methods may omit or black out excluded windows. |
@@ -341,6 +359,7 @@ like a normal local Windows desktop.
 | --- | --- |
 | `main.cpp` | Command-line parsing, DPI awareness, entry point, and error reporting. |
 | `runtime/app.cpp` | Automatic/manual coordination, desktop capture, effect stacking, overlay ownership, and cleanup. |
+| `runtime/startup_gate.cpp` | Two default-No confirmations, each with a three-second Yes-button lockout, before simulator initialization. |
 | `runtime/menu.cpp` | Native control panel, scrolling payload lists, toggles, and finale style selection. |
 | `runtime/schedule.h` | Ten-second stages, ten-visual sequence, and audio-selection timing. |
 | `runtime/finale.cpp` | Silent two-second fake freeze, ten-second presentation, input handling, and emergency exits. |
@@ -349,6 +368,7 @@ like a normal local Windows desktop.
 | `payloads/sound/` | Sound generators, synthesis helpers, registry, loop synthesis, and streaming player. |
 | `payloads.md` | Complete payload catalog with quick summaries. |
 | `compile.cmd` | Modular release build script. |
+| `tests/` | Non-interactive startup verification and test instructions. |
 
 Normal visuals are registered in `payloads/visual/registry.cpp`; sounds are
 registered in `payloads/sound/registry.cpp`. The blue-screen finale is coordinated

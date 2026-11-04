@@ -2,12 +2,12 @@
 
 ## Build and verification
 - Windows-only C++17/Win32 application. From the repository root, build with `g++ --version` then `.\compile.cmd` (MinGW-w64 with threading support).
-- **Build side effects:** `compile.cmd` forcibly stops running `JetmyV2` processes and deletes the existing executable before compilation. If the compiler path contains spaces, it also attempts to rename `default-manifest.o` inside the compiler installation. Do not treat this as a side-effect-free check.
+- **Build side effects:** `compile.cmd` forcibly stops running `JetmyV2` processes and deletes the existing executable before compilation. It uses temporary linker specs to omit GCC's default manifest without modifying the compiler installation. Do not treat this as a side-effect-free check.
 - The build discovers `runtime/*.cpp`, `payloads/visual/*.cpp`, and `payloads/sound/*.cpp` automatically. Keep test entrypoints outside those directories. `version.rc` embeds the manifest/version metadata when `windres` is available.
-- For off-screen checks, use the PowerShell compile/run block in `tests/README.md`. It exercises every registered visual and sound, including full-overwrite buffer exchange and worker coverage, but not the menu, finale, or live audio streaming. Keep assertions enabled (`-DNDEBUG` disables the checks).
+- For non-interactive startup checks, use `tests/run_startup_tests.ps1` as documented in `tests/README.md`. It tests both confirmation paths and their independent three-second delays with a simulated clock; it shows no dialogs and performs no machine probes. It does not exercise native UI, payload rendering, the menu, finale, or audio streaming. Keep assertions enabled (`-DNDEBUG` disables the checks).
 - When invoking the compiler directly, prepend its `bin` directory to the process `PATH`, as the test instructions do; finding `g++.exe` alone may not suffice for its subprocesses/runtime DLLs.
 - Direct builds linking `runtime/blue_screen.cpp` need `-lgdiplus`; keep its canvas at presentation pixel dimensions and use 1:1 blits, not low-resolution bitmap upscaling.
-- Never launch `.\JetmyV2.exe` without arguments as an automated smoke test: it immediately starts flashing visuals and audio. For user-requested interactive checks, `.\JetmyV2.exe --menu` starts with all effects off. Exit with Ctrl+Shift+Q or Ctrl+Shift+Esc; Escape also exits during the finale.
+- Never launch `.\JetmyV2.exe` without arguments as an automated smoke test: after two timed approvals it starts flashing visuals and audio. Each Yes button stays disabled for its first three seconds; there is no VM detection. For user-requested interactive checks, `.\JetmyV2.exe --menu` requires the same gate and starts with all effects off. Exit with Ctrl+Shift+Q or Ctrl+Shift+Esc; Escape also exits during the finale.
 - `*.exe` and `resources.o` are ignored build artifacts; a pre-existing executable does not establish that current sources were built.
 
 ## Runtime contracts

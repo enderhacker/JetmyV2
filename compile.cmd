@@ -134,12 +134,12 @@ foreach ($pattern in $SourcePatterns) {
 }
 
 # ------------------------------------------------------------------------------
-# 4. Environment & default-manifest.o Neutralization
+# 4. Environment
 # ------------------------------------------------------------------------------
 $binDir = Split-Path -Parent $gppPath
-$rootDir = Split-Path -Parent $binDir
 $env:PATH = "$binDir;" + $env:PATH
 $resObj = "resources.o"
+$specsFile = $null
 
 # Setup MAKE so LTO parallelizes across cores without serial warnings
 $makeExe = Join-Path $binDir "mingw32-make.exe"
@@ -149,16 +149,6 @@ if (Test-Path -LiteralPath $makeExe) {
     $makeCmd = Get-Command "make.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($makeCmd) {
         $env:MAKE = if ($makeCmd.Path) { $makeCmd.Path } else { $makeCmd.Source }
-    }
-}
-
-# Unconditionally disable default-manifest.o to prevent manifest collisions (.rsrc merge failure)
-if ($rootDir -and (Test-Path -LiteralPath $rootDir)) {
-    $manifestFiles = Get-ChildItem -LiteralPath $rootDir -Filter "default-manifest.o" -Recurse -File -ErrorAction SilentlyContinue
-    foreach ($mFile in $manifestFiles) {
-        try {
-            Rename-Item -LiteralPath $mFile.FullName -NewName "default-manifest.o.disabled" -Force -ErrorAction SilentlyContinue
-        } catch {}
     }
 }
 
@@ -173,6 +163,19 @@ try {
         Write-Host ($verOutput -join "`n") -ForegroundColor Red
         exit 1
     }
+
+    # Omit GCC's default manifest locally: version.rc supplies the application
+    # manifest. Never rename files in the compiler installation. This also works
+    # when an older build script has already renamed default-manifest.o.
+    $specOutput = (& $gppPath '-dumpspecs' 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect GCC linker specs.' }
+    $endfile = [regex]::Match(($specOutput -join "`n"), '(?ms)^\*endfile:\r?\n(.*?)\r?\n\r?\n')
+    if (-not $endfile.Success) { throw 'Cannot locate GCC endfile linker spec.' }
+    $localEndfile = $endfile.Groups[1].Value.Replace('%{!shared:%:if-exists(default-manifest.o%s)}', '').Replace('default-manifest.o%s', '')
+    $specDirectory = Join-Path $env:LOCALAPPDATA 'Temp\opencode'
+    New-Item -ItemType Directory -Path $specDirectory -Force | Out-Null
+    $specsFile = Join-Path $specDirectory ('jetmy-link-' + [Guid]::NewGuid().ToString('N') + '.specs')
+    Set-Content -LiteralPath $specsFile -Encoding ASCII -Value "*endfile:`n$localEndfile`n"
 
     # Detección segura de arquitectura sin invocar .Trim() en nulos
     $rawDump = (& $gppPath -dumpmachine 2>&1)
@@ -248,6 +251,7 @@ try {
         "-I."
         "-pthread"
         "-DNDEBUG"
+        "-specs=$specsFile"
 
         # Code Warnings
         "-Wall"
@@ -321,6 +325,9 @@ try {
     Write-Host "[+] Size   : $sizeKb KB ($($fileInfo.Length) bytes)" -ForegroundColor Gray
 }
 finally {
+    if ($specsFile -and (Test-Path -LiteralPath $specsFile)) {
+        Remove-Item -LiteralPath $specsFile -Force -ErrorAction SilentlyContinue
+    }
     if (Test-Path -LiteralPath $resObj) {
         Remove-Item -LiteralPath $resObj -Force -ErrorAction SilentlyContinue
     }

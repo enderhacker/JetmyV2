@@ -3,6 +3,7 @@
 #include "schedule.h"
 #include "menu.h"
 #include "app.h"
+#include "startup_gate.h"
 #include "finale.h"
 #include "profiler.h"
 #include <chrono>
@@ -337,6 +338,8 @@ int Run(HINSTANCE instance, bool menuMode) {
 
 namespace Runtime {
 int RunApplication(HINSTANCE instance, bool menuMode) {
+    const StartupResult startup = CheckStartup(menuMode);
+    if (startup != StartupResult::Allowed) return 0;
     running = true;
     return Run(instance, menuMode);
 }
