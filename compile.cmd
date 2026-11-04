@@ -61,23 +61,33 @@ function Find-Compiler {
 
     foreach ($pattern in $knownPaths) {
         $found = Resolve-Path -LiteralPath $pattern -ErrorAction SilentlyContinue
-        if ($found) { return $found[0].Path }
+        if ($found) { return [string]$found[0].Path }
         $glob = Resolve-Path $pattern -ErrorAction SilentlyContinue
-        if ($glob) { return $glob[0].Path }
+        if ($glob) { return [string]$glob[0].Path }
     }
 
-    $cmd = Get-Command "g++.exe" -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
+    $cmd = Get-Command "g++.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($cmd) {
+        if ($cmd.Path) { return [string]$cmd.Path }
+        if ($cmd.Source) { return [string]$cmd.Source }
+    }
 
     return $null
 }
 
 $gppPath = Find-Compiler
 
-if (-not $gppPath) {
+# Asegurar que sea una sola cadena si llegó un array
+if ($gppPath -is [array]) {
+    $gppPath = $gppPath[0]
+}
+
+if (-not $gppPath -or -not (Test-Path -LiteralPath $gppPath)) {
     Write-Host "[!] ERROR: g++ was not found in PATH or standard installation paths." -ForegroundColor Red
     exit 1
 }
+
+Write-Host "[*] Compiler detected: $gppPath" -ForegroundColor Cyan
 
 # ------------------------------------------------------------------------------
 # 2. Terminate Running Instance & Remove Old Binary
@@ -135,24 +145,45 @@ $resObj = "resources.o"
 $makeExe = Join-Path $binDir "mingw32-make.exe"
 if (Test-Path -LiteralPath $makeExe) {
     $env:MAKE = $makeExe
-} elseif (Get-Command "make.exe" -ErrorAction SilentlyContinue) {
-    $env:MAKE = (Get-Command "make.exe").Source
+} else {
+    $makeCmd = Get-Command "make.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($makeCmd) {
+        $env:MAKE = if ($makeCmd.Path) { $makeCmd.Path } else { $makeCmd.Source }
+    }
 }
 
 # Unconditionally disable default-manifest.o to prevent manifest collisions (.rsrc merge failure)
-# and fix GCC's collect2 unquoted path-with-spaces bug.
-$manifestFiles = Get-ChildItem -LiteralPath $rootDir -Filter "default-manifest.o" -Recurse -File -ErrorAction SilentlyContinue
-foreach ($mFile in $manifestFiles) {
-    try {
-        Rename-Item -LiteralPath $mFile.FullName -NewName "default-manifest.o.disabled" -Force -ErrorAction SilentlyContinue
-    } catch {}
+if ($rootDir -and (Test-Path -LiteralPath $rootDir)) {
+    $manifestFiles = Get-ChildItem -LiteralPath $rootDir -Filter "default-manifest.o" -Recurse -File -ErrorAction SilentlyContinue
+    foreach ($mFile in $manifestFiles) {
+        try {
+            Rename-Item -LiteralPath $mFile.FullName -NewName "default-manifest.o.disabled" -Force -ErrorAction SilentlyContinue
+        } catch {}
+    }
 }
 
 try {
     # --------------------------------------------------------------------------
     # 5. Architecture Detection & Platform Specific Optimization
     # --------------------------------------------------------------------------
-    $machine = (& $gppPath -dumpmachine).Trim()
+    # Verificación de ejecución básica de g++
+    $verOutput = (& $gppPath --version 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[!] ERROR: g++ failed to execute. Details:" -ForegroundColor Red
+        Write-Host ($verOutput -join "`n") -ForegroundColor Red
+        exit 1
+    }
+
+    # Detección segura de arquitectura sin invocar .Trim() en nulos
+    $rawDump = (& $gppPath -dumpmachine 2>&1)
+    $machine = [string]($rawDump -join "`n")
+    $machine = $machine.Trim()
+
+    # Si dumpmachine vino vacío, intentar inferirlo de --version o -v
+    if (-not $machine) {
+        $machine = [string]($verOutput -join "`n")
+    }
+
     $archOptArgs = @()
 
     if ($machine -match "i686|i386") {
@@ -160,14 +191,17 @@ try {
         $subsystemArg = "-Wl,--subsystem,windows:5.1"
         $windresTarget = "pe-i386"
         
-        # Crucial for zero-lag 32-bit math/GDI: Use SSE2 instead of slow x87 FPU stack
         $archOptArgs += @(
             "-msse2",
             "-mfpmath=sse",
             "-mstackrealign"
         )
-    } else {
+    } elseif ($machine -match "x86_64|amd64") {
         Write-Host "[*] Architecture: x86_64 (64-bit) -> Executable on Win 7, 10, 11 (x64 and Win11 ARM64)" -ForegroundColor Cyan
+        $subsystemArg = "-Wl,--subsystem,windows:6.1"
+        $windresTarget = "pe-x86-64"
+    } else {
+        Write-Host "[!] Warning: Architecture machine string '$machine' unrecognized. Defaulting to x86_64." -ForegroundColor Yellow
         $subsystemArg = "-Wl,--subsystem,windows:6.1"
         $windresTarget = "pe-x86-64"
     }
@@ -220,7 +254,7 @@ try {
         "-Wextra"
         "-Wno-unused-parameter"
 
-        # === HIGH-PERFORMANCE OPTIMIZATIONS (Eliminate Loop / GDI Lag) ===
+        # Optimization
         "-O3"
         "-ffast-math"
         "-fno-math-errno"
@@ -234,7 +268,7 @@ try {
         # Architecture-specific SIMD & realign flags
         $archOptArgs
 
-        # === SIZE REDUCTION & CLEAN PE HEADERS ===
+        # Size reduction
         "-s"
         "-fno-ident"
         "-fno-rtti"
@@ -244,16 +278,16 @@ try {
         "-Wl,--gc-sections"
         "-Wl,--file-alignment=512"
 
-        # === OS SUBSYSTEM & WINDOWED MODE ===
+        # Subsystem
         $subsystemArg
         "-mwindows"
 
-        # === STANDALONE ZERO-DEPENDENCY LINKING ===
+        # Standalone linking
         "-static"
         "-static-libgcc"
         "-static-libstdc++"
 
-        # === LINKED LIBRARIES ===
+        # Libraries
         "-lgdi32"
         "-lgdiplus"
         "-luser32"
