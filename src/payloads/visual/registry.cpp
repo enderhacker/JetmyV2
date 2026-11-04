@@ -48,7 +48,6 @@ const std::vector<PayloadRecord>& Registry() {
         { "Paper Accordion", EffectPaperAccordion, true, false, true },
         { "Zipper Rift", EffectZipperRift, true, false, true },
         { "Error Barcode", EffectErrorBarcode, true, false, true },
-        { "Circuit Etching", EffectCircuitEtching, true, false, true },
         { "ASCII Corruption", EffectAsciiCorruption, true, false, true }
     };
     return payloads;

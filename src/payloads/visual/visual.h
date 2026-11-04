@@ -185,7 +185,6 @@ void EffectScreenDecay(float, float);
 void EffectPaperAccordion(float, float);
 void EffectZipperRift(float, float);
 void EffectErrorBarcode(float, float);
-void EffectCircuitEtching(float, float);
 void EffectAsciiCorruption(float, float);
 
 } // namespace VisualPayloads

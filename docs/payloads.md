@@ -1,6 +1,6 @@
 # Payloads
 
-All 61 payloads: 39 visual effects, one finale and 21 sounds. Use `JetmyV2.exe --menu`
+All 60 payloads: 38 visual effects, one finale and 21 sounds. Use `JetmyV2.exe --menu`
 to preview them individually. Visual effects draw into an overlay without changing
 the desktop or Windows display settings. Audio payloads loop while selected.
 
@@ -50,7 +50,6 @@ independently on each monitor. Display-layout changes end the session safely.
 | Paper Accordion | Alternating mirrored desktop pleats breathe in depth, with shaded back faces and red creases. |
 | Zipper Rift | A moving zipper pulls the desktop apart along a curved seam, exposing a dark red checkerboard with interlocking teeth. |
 | Error Barcode | The desktop becomes a shifting, variable-height machine barcode beneath a sweeping red scanner beam. |
-| Circuit Etching | Etches the desktop into green diagonal circuit traces and copper nodes, with traveling voltage pulses. |
 | ASCII Corruption | Reconstructs desktop luminance as a crisp bitmap-glyph terminal, interrupted by crawling red corruption cells. |
 
 ## Finale
