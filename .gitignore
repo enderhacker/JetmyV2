@@ -2,3 +2,4 @@
 resources.o
 /build/
 __pycache__/
+.o

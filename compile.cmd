@@ -33,8 +33,7 @@ function Format-Elapsed([TimeSpan]$ts) {
     return "{0:F2}s" -f $ts.TotalSeconds
 }
 
-$BuildDirectory = "build"
-$Target = "$BuildDirectory/JetmyV2.exe"
+$Target = "JetmyV2.exe"
 $SourcePatterns = @(
     "src/main.cpp",
     "src/runtime/*.cpp",
@@ -139,8 +138,7 @@ foreach ($pattern in $SourcePatterns) {
 # ------------------------------------------------------------------------------
 $binDir = Split-Path -Parent $gppPath
 $env:PATH = "$binDir;" + $env:PATH
-New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
-$resObj = "$BuildDirectory/resources.o"
+$resObj = "$resources.o"
 $specsFile = $null
 
 # Setup MAKE so LTO parallelizes across cores without serial warnings
