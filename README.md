@@ -353,3 +353,8 @@ like a normal local Windows desktop.
 Normal visuals are registered in `payloads/visual/registry.cpp`; sounds are
 registered in `payloads/sound/registry.cpp`. The blue-screen finale is coordinated
 separately so it stops all normal payloads and always runs last in automatic mode.
+
+Each registered visual and sound has its own `.cpp` file named after its menu
+label in lowercase `snake_case` (for example, `cursor_trail.cpp` and
+`two_tone_siren.cpp`). Shared helpers, registries, and the separate finale retain
+their infrastructure filenames.

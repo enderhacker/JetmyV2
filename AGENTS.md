@@ -31,4 +31,5 @@
 - Idle/audio-only mode skips visual frame capture/rendering, but Digital Noise Bursts makes one temporary desktop capture during synthesis and uses 16 pixels to seed its LFSR. Its tests therefore read pixels even though they show no overlay and play no sound.
 
 ## Adding or changing payloads
+- Keep one registered visual/sound per `.cpp` file, named after its display label in lowercase `snake_case` (replace spaces/hyphens with underscores). Shared helper and registry files are not payload implementations.
 - Update declarations, registry entries, and `payloads.md` together. Reconcile totals in `README.md`/`payloads.md` and hard-coded registry-count assertions in `tests/performance.cpp` when adding/removing entries; menu counts are derived automatically.

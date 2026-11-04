@@ -1,20 +1,6 @@
 #include "chaos.h"
 
 namespace SoundPayloads {
-float BytebeatXenonTear(uint32_t t, Voice&) {
-    return Chaos::Byte((t * ((t >> 5) | (t >> 8))) ^ (t >> 16));
-}
-
-float BytebeatAcidFracture(uint32_t t, Voice&) {
-    return Chaos::Byte((t * 5u & t >> 7) | (t * 3u & t >> 10) |
-        (t * (((t >> 12) | (t >> 8)) & 63u & (t >> 4))));
-}
-
-float BytebeatVoidEngine(uint32_t t, Voice&) {
-    // Explicit modulo-32 shift count: the literal formula otherwise has undefined shifts.
-    return Chaos::Byte(((t >> 6) | t | (t >> ((t >> 16) & 31u))) * 10u + ((t >> 11) & 7u));
-}
-
 float MemoryBusGlitch(uint32_t t, Voice& voice) {
     // Synthetic register patterns only: never read process memory or hardware registers.
     uint32_t address = t * 1664525u + 1013904223u;
