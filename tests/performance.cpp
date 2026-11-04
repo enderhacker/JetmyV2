@@ -41,8 +41,8 @@ void Prepare(const VisualPayloads::PayloadRecord& effect) {
 }
 }
 
-// No presentation window, audio device, or desktop capture. Ghost cursors and
-// Entropy Handshake still query the live cursor/desktop, so their hashes vary.
+// No presentation window or audio device. Cursor Trail and Digital Noise Bursts
+// still query the live cursor/desktop, so their hashes vary.
 int main(int argc, char** argv) {
     using namespace VisualPayloads;
     const int w = argc > 1 ? std::atoi(argv[1]) : 1920;

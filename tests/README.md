@@ -2,8 +2,8 @@
 
 `performance.cpp` exercises **all 33 registered visuals and all 18 sounds**.
 It creates memory DIBs, not presentation windows, and synthesizes audio without
-opening an audio device. It never starts the show or finale. Ghost Cursor Swarm
-queries the live cursor; Entropy Handshake briefly captures the desktop to seed
+opening an audio device. It never starts the show or finale. Cursor Trail
+queries the live cursor; Digital Noise Bursts briefly captures the desktop to seed
 its noise. No captured image is retained or written by these tests.
 
 From the repository root in PowerShell:

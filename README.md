@@ -39,7 +39,7 @@ JetmyV2 does **not**:
 - Modify your documents, wallpaper, display orientation, or resolution.
 - Install itself as a service or configure startup persistence.
 - Move the mouse pointer or rewrite text in other applications.
-- Open real error dialogs when displaying Popup Cascade.
+- Open real error dialogs when displaying Fake Message Popups.
 - Crash Windows, restart the computer, or create a memory dump.
 - Globally block keyboard or mouse input.
 - Change your system volume.
@@ -120,14 +120,14 @@ Launch with `--menu` to open a native Windows control panel. All payloads start
 - Click a visual's button to turn it on; click again to turn it off.
 - Enable just one to inspect it, or enable several to combine their output.
 - Re-enabling an effect restarts its animation state.
-- Digital infection, paint, icons, and simulated popups draw over the incoming
-  image. Infection filaments remain until the effect is restarted.
-  Shatter, voxel explosion, and Reality Collapse preserve the
+- Growing Light Trails, paint, icons, and simulated popups draw over the incoming
+  image. Light trails remain until the effect is restarted.
+  Shattered Screen, Exploding Blocks, and Screen Collapse preserve the
   incoming image as their texture, with black space around the moving pieces.
   A black-backed effect covers earlier layers; effects drawn afterward can still
   appear on top. Ordinary desktop distortions keep their image backgrounds.
 - Turning off every visual hides the effects overlay. The idle/audio-only menu
-   does not capture or render visual frames. Entropy Handshake makes one temporary
+   does not capture or render visual frames. Digital Noise Bursts makes one temporary
    desktop capture when its audio loop is generated, using 16 pixels solely to seed its noise.
 - The panel stays clear of the visual overlay so its controls remain usable.
 
@@ -171,21 +171,21 @@ Visuals include desktop warping, rotation, recursive tunnels, glass shattering,
 melting, persistent paint trails, pixel sorting, fractals, status icons, and simulated
 popups. Their names describe visual effects, not actual changes to Windows.
 For example, Rotate Screen transforms the captured image rather than changing
-display settings; Popup Cascade's messages do not report actual system problems.
-Pixel Sorting Anomaly smears large overlapping sorted bands with displaced scanlines
-and rapid reshuffling. Screen Color Inversion alternates inverted and normal output
+display settings; the messages in Fake Message Popups do not report actual system problems.
+Sorted Color Bands smears large overlapping sorted bands with displaced scanlines
+and rapid reshuffling. Flashing Inverted Colors alternates inverted and normal output
 every 500 ms, starting inverted; this produces full-screen flashing.
 
-Seismic Slice & Drift adds counter-phase raster shearing; Recursive ROP Crucible
+Sliding Screen Strips adds counter-phase raster shearing; Zooming Screen Glitch
 keeps its own previous overlay frame for expanding XOR/difference feedback;
-Bit-Plane Topography cycles binary luminance contours with brief visible inversions.
+Flashing Brightness Bands cycles binary luminance contours with brief visible inversions.
 These effects contain particularly strong motion and flashing.
 
 The 18 sounds are deliberately abrasive glitch/noise simulations: bytebeat
 fractures, buffer-freeze stutters, corrupted alarms, bit-depth collapse, modem
 hash, PC-speaker storms, feedback howl, accelerating crackles and a rising
-Shepard sawtooth bank. Industrial Scream and Entropy Handshake are retained;
-the former melodic/ambient collection and Shepard-Risset Descent are replaced.
+layered rising buzz. Harsh Digital Buzz and Digital Noise Bursts retain the
+earlier noise generators; the former melodic/ambient collection is replaced.
 See [payloads.md](payloads.md#sound-payloads) for the complete list.
 
 Sounds are synthesized locally rather than played from song recordings. Normal
@@ -197,7 +197,7 @@ Clipping, aliasing, buffer starvation and register patterns are synthesized effe
 not actual device failures or reads of CPU/process memory. The stream remains
 8 kHz mono: modem sounds are stylized, and comb resonances sweep approximately
 1–3.6 kHz, not the upper human hearing range. Bounded PCM does not guarantee safe
-listening volume; start low. Entropy Handshake discards sampled pixel values immediately after mixing
+listening volume; start low. Digital Noise Bursts discards sampled pixel values immediately after mixing
 them into its local LFSR seed; it does not save or transmit desktop images.
 
 For a payload-by-payload performance audit, measured improvements, off-screen

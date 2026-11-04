@@ -13,7 +13,7 @@
 ## Runtime contracts
 - `main.cpp` delegates to `Runtime::RunApplication`; `runtime/app.cpp` owns capture, framebuffers, stacking, and audio selection. The menu changes `Controls`; it does not render or play payloads itself.
 - Manual stacking follows registry order, not the menu's alphabetical display order. Keep menu command IDs and selection state mapped to registry indices.
-- `runtime/schedule.h` controls the automatic show: ten distinct visuals accumulate at ten-second intervals; audio changes every other stage. The actual blue-screen finale is separate (`runtime/finale.cpp`), not a visual registry entry. `Reality Collapse Finale` is an ordinary visual despite its name.
+- `runtime/schedule.h` controls the automatic show: ten distinct visuals accumulate at ten-second intervals; audio changes every other stage. The actual blue-screen finale is separate (`runtime/finale.cpp`), not a visual registry entry. `Screen Collapse` is an ordinary visual, not the finale.
 - Preserve the simulator boundary: effects modify temporary overlays/in-memory audio, not Windows settings or other applications. Preserve capture exclusion, the menu's overlay cutout, emergency exits, and cleanup. Normal visuals target the primary monitor; only the finale covers the virtual desktop.
 
 ## Visual payloads
@@ -28,7 +28,7 @@
 ## Sound payloads
 - Declare generators in `payloads/sound/sound.h` and register them in `payloads/sound/registry.cpp`. Signature: `float Generator(uint32_t sample, Voice&)`; oscillator/filter/noise state belongs to the clip-local `Voice`, not shared statics.
 - `player.cpp` synthesizes clips before playback, smooths loop seams, filters/clamps samples to bounded PCM, and owns one queued WinMM stream with selection crossfades. Do not open separate playback devices in normal generators. The stream is 8 kHz mono: 4 kHz is Nyquist, not a usable ordinary carrier frequency.
-- Idle/audio-only mode skips visual frame capture/rendering, but Entropy Handshake makes one temporary desktop capture during synthesis and uses 16 pixels to seed its LFSR. Its tests therefore read pixels even though they show no overlay and play no sound.
+- Idle/audio-only mode skips visual frame capture/rendering, but Digital Noise Bursts makes one temporary desktop capture during synthesis and uses 16 pixels to seed its LFSR. Its tests therefore read pixels even though they show no overlay and play no sound.
 
 ## Adding or changing payloads
 - Update declarations, registry entries, and `payloads.md` together. Reconcile totals in `README.md`/`payloads.md` and hard-coded registry-count assertions in `tests/performance.cpp` when adding/removing entries; menu counts are derived automatically.

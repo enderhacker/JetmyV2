@@ -3,24 +3,24 @@
 namespace SoundPayloads {
 const std::vector<PayloadRecord>& Registry() {
     static const std::vector<PayloadRecord> payloads = {
-        {"Bytebeat Industrial Scream", BytebeatIndustrialScream},
-        {"Entropy Handshake", EntropyHandshake},
-        {"Buffer Freeze Stutter", BufferFreezeStutter},
-        {"Dual-Tone Siren Warp", DualToneSirenWarp},
-        {"Bytebeat Xenon Tear", BytebeatXenonTear},
-        {"Bit-Rot Quantizer", BitRotQuantizer},
-        {"Subharmonic Meltdown", SubharmonicMeltdown},
-        {"Modem Carrier Hell", ModemCarrierHell},
-        {"Bytebeat Acid Fracture", BytebeatAcidFracture},
-        {"PC Speaker Beep Storm", PCSpeakerBeepStorm},
-        {"Square-Wave Strobe", SquareWaveStrobe},
-        {"FM Feedback Howl", FMFeedbackHowl},
-        {"Radiation Avalanche", RadiationAvalanche},
-        {"Shepard Panic Ascent", ShepardPanicAscent},
-        {"Ring-Mod Tritone Clash", RingModTritoneClash},
-        {"Bytebeat Void Engine", BytebeatVoidEngine},
-        {"Memory Bus Glitch", MemoryBusGlitch},
-        {"Comb Filter Screamer", CombFilterScreamer}
+        {"Harsh Digital Buzz", BytebeatIndustrialScream},
+        {"Digital Noise Bursts", EntropyHandshake},
+        {"Stuttering Noise", BufferFreezeStutter},
+        {"Two-Tone Siren", DualToneSirenWarp},
+        {"Metallic Clicks", BytebeatXenonTear},
+        {"Crunchy Digital Noise", BitRotQuantizer},
+        {"Rattling Bass", SubharmonicMeltdown},
+        {"Distorted Modem", ModemCarrierHell},
+        {"Rapid Digital Notes", BytebeatAcidFracture},
+        {"Rapid Computer Beeps", PCSpeakerBeepStorm},
+        {"Pulsing Beep", SquareWaveStrobe},
+        {"Wobbling Squeal", FMFeedbackHowl},
+        {"Building Static", RadiationAvalanche},
+        {"Rising Buzz", ShepardPanicAscent},
+        {"Clashing Tones", RingModTritoneClash},
+        {"Grinding Digital Noise", BytebeatVoidEngine},
+        {"Glitchy Noise Bursts", MemoryBusGlitch},
+        {"Whistling Noise", CombFilterScreamer}
     };
     return payloads;
 }
