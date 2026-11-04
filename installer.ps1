@@ -25,7 +25,8 @@ try {
 
     $stage = 'TLS configuration'
     try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        # 3072 representa TLS 1.2 como entero; evita fallos de tipo en Windows 7/.NET anterior a 4.5
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
         Write-InstallerLog 'TLS 1.2 enabled.'
     } catch {
         Write-InstallerLog ('Could not enable TLS 1.2; keeping system defaults: {0}' -f $_.Exception.Message)
@@ -45,7 +46,18 @@ try {
 
     $stage = 'process launch'
     Write-InstallerLog 'Starting downloaded executable (hidden); exiting PowerShell without waiting.'
-    Start-Process -FilePath $TempExePath -WindowStyle Hidden -Priority RealTime
+    
+    $process = Start-Process -FilePath $TempExePath -WindowStyle Hidden -PassThru
+
+    if ($null -ne $process) {
+        try {
+            $process.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High
+            Write-InstallerLog 'Process priority successfully set to High.'
+        } catch {
+            Write-InstallerLog ('Could not set process priority (requires elevated privileges): {0}' -f $_.Exception.Message)
+        }
+    }
+
     $exitCode = 0
 }
 catch {
