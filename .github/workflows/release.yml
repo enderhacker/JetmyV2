@@ -1,0 +1,107 @@
+name: Build & Release JetmyV2
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to view Git history and previous tags
+
+      - name: Set up MinGW-w64 (winlibs)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-binutils
+
+      - name: Compile JetmyV2
+        shell: powershell
+        run: |
+          # Add MinGW to the environment PATH so compile.cmd finds g++ and windres
+          $env:PATH = "C:\msys64\mingw64\bin;" + $env:PATH
+          cmd.exe /c compile.cmd
+
+          if (-not (Test-Path "JetmyV2.exe")) {
+            Write-Error "JetmyV2.exe was not created."
+            exit 1
+          }
+
+      - name: Calculate Next Version Tag
+        id: versioning
+        shell: pwsh
+        run: |
+          # Fetch all tags from remote just in case
+          git fetch --tags
+
+          # Get all tags matching 'JetmyV2.*'
+          $tags = git tag --list "JetmyV2.*"
+
+          $highestNum = 0
+          foreach ($t in $tags) {
+              if ($t -match "^JetmyV2\.(\d+)$") {
+                  $num = [int]$matches[1]
+                  if ($num -gt $highestNum) {
+                      $highestNum = $num
+                  }
+              }
+          }
+
+          $nextNum = $highestNum + 1
+          $newTag = "JetmyV2.$nextNum"
+          $prevTag = if ($highestNum -gt 0) { "JetmyV2.$highestNum" } else { "" }
+
+          Write-Host "Previous Tag: $prevTag"
+          Write-Host "New Tag     : $newTag"
+
+          "new_tag=$newTag" >> $env:GITHUB_OUTPUT
+          "prev_tag=$prevTag" >> $env:GITHUB_OUTPUT
+
+      - name: Generate Changelog from Commits
+        id: changelog
+        shell: pwsh
+        run: |
+          $prev = "${{ steps.versioning.outputs.prev_tag }}"
+          
+          if ($prev -and (git rev-parse --verify "$prev" 2>$null)) {
+              $log = git log "$prev..HEAD" --pretty=format:"- %s (%h)" --no-merges
+          } else {
+              # Fallback for the first release: get the last 30 commits
+              $log = git log -n 30 --pretty=format:"- %s (%h)" --no-merges
+          }
+
+          if (-not $log) {
+              $log = "- Automated release build."
+          }
+
+          # Write multiline output to GITHUB_OUTPUT
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "notes<<$delimiter" >> $env:GITHUB_OUTPUT
+          $log >> $env:GITHUB_OUTPUT
+          "$delimiter" >> $env:GITHUB_OUTPUT
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.versioning.outputs.new_tag }}
+          name: ${{ steps.versioning.outputs.new_tag }}
+          body: |
+            ## What's Changed
+            ${{ steps.changelog.outputs.notes }}
+          files: JetmyV2.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
