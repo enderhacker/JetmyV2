@@ -37,13 +37,10 @@ HRESULT CALLBACK ConfirmationCallback(HWND window, UINT notification, WPARAM wPa
 bool Confirm(int step, bool menuMode, void*) {
     std::wstring message;
     if (step == 1) {
-        message = L"Malware simulator. Computer destruction is simulated. Please use a VM.\n\n"
-            L"Flashing images and harsh audio. Continue?";
+        message = L"This file is malicious. This is meant to harm your system irreversibly and permanently destroy all your data.\n"
+            L"Only click 'Yes' if you are running this in a virtual machine and understand the consequences of running virus/malware in your device.";
     } else {
-        message = menuMode
-            ? L"Open manual controls? Effects start off.\n\n"
-            : L"Start the show now?\n\n";
-        message += L"Exit: Ctrl+Shift+Q or Ctrl+Shift+Esc.";
+        message = L"You've clicked 'Yes' to proceed with the malicious software. Confirm again if you want to run malicious code in your system that will cause irreversible damage to your computer and data.\nClick 'yes' to execute the malicious code or 'no' to exit the program safely.";
     }
 
     ConfirmationState state;
